@@ -13,6 +13,7 @@ pub enum LuaDeclTypeKind {
     Class,
     Enum,
     Alias,
+    Env,
 }
 
 flags! {
@@ -52,6 +53,7 @@ impl LuaTypeDecl {
             extra: match kind {
                 LuaDeclTypeKind::Enum => Box::new(LuaTypeExtra::Enum { base: None }),
                 LuaDeclTypeKind::Class => Box::new(LuaTypeExtra::Class),
+                LuaDeclTypeKind::Env => Box::new(LuaTypeExtra::Env),
                 LuaDeclTypeKind::Alias => Box::new(LuaTypeExtra::Alias {
                     origin: None
                 }),
@@ -84,6 +86,7 @@ impl LuaTypeDecl {
             LuaTypeExtra::Enum { .. } => LuaDeclTypeKind::Enum,
             LuaTypeExtra::Class => LuaDeclTypeKind::Class,
             LuaTypeExtra::Alias { .. } => LuaDeclTypeKind::Alias,
+            LuaTypeExtra::Env => LuaDeclTypeKind::Env,
         }
     }
 
@@ -97,6 +100,10 @@ impl LuaTypeDecl {
 
     pub fn is_alias(&self) -> bool {
         matches!(&*self.extra, LuaTypeExtra::Alias { .. })
+    }
+
+    pub fn is_env(&self) -> bool {
+        matches!(&*self.extra, LuaTypeExtra::Env)
     }
 
     pub fn get_attrib(&self) -> Option<FlagSet<LuaTypeAttribute>> {
@@ -239,6 +246,7 @@ pub enum LuaTypeExtra {
         base: Option<LuaType>,
     },
     Class,
+    Env,
     Alias {
         origin: Option<LuaType>,
     },

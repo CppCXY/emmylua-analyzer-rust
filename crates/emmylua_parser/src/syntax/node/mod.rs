@@ -61,6 +61,7 @@ pub enum LuaAst {
     LuaComment(LuaComment),
     // doc tag
     LuaDocTagClass(LuaDocTagClass),
+    LuaDocTagEnv(LuaDocTagEnv),
     LuaDocTagEnum(LuaDocTagEnum),
     LuaDocTagAlias(LuaDocTagAlias),
     LuaDocTagType(LuaDocTagType),
@@ -144,6 +145,7 @@ impl LuaAstNode for LuaAst {
             LuaAst::LuaElseIfClauseStat(node) => node.syntax(),
             LuaAst::LuaElseClauseStat(node) => node.syntax(),
             LuaAst::LuaDocTagClass(node) => node.syntax(),
+            LuaAst::LuaDocTagEnv(node) => node.syntax(),
             LuaAst::LuaDocTagEnum(node) => node.syntax(),
             LuaAst::LuaDocTagAlias(node) => node.syntax(),
             LuaAst::LuaDocTagType(node) => node.syntax(),
@@ -228,6 +230,7 @@ impl LuaAstNode for LuaAst {
             LuaSyntaxKind::ElseClauseStat => true,
             LuaSyntaxKind::Comment => true,
             LuaSyntaxKind::DocTagClass => true,
+            LuaSyntaxKind::DocTagEnv => true,
             LuaSyntaxKind::DocTagEnum => true,
             LuaSyntaxKind::DocTagAlias => true,
             LuaSyntaxKind::DocTagType => true,
@@ -327,6 +330,7 @@ impl LuaAstNode for LuaAst {
                 LuaElseClauseStat::cast(syntax).map(LuaAst::LuaElseClauseStat)
             }
             LuaSyntaxKind::DocTagClass => LuaDocTagClass::cast(syntax).map(LuaAst::LuaDocTagClass),
+            LuaSyntaxKind::DocTagEnv => LuaDocTagEnv::cast(syntax).map(LuaAst::LuaDocTagEnv),
             LuaSyntaxKind::DocTagEnum => LuaDocTagEnum::cast(syntax).map(LuaAst::LuaDocTagEnum),
             LuaSyntaxKind::DocTagAlias => LuaDocTagAlias::cast(syntax).map(LuaAst::LuaDocTagAlias),
             LuaSyntaxKind::DocTagType => LuaDocTagType::cast(syntax).map(LuaAst::LuaDocTagType),
