@@ -1,6 +1,9 @@
 mod add_decl_completion;
 mod add_member_completion;
+mod match_key;
 
+
+pub use match_key::match_keyword;
 pub use add_decl_completion::add_decl_completion;
 pub use add_member_completion::{add_member_completion, CompletionTriggerStatus};
 use emmylua_code_analysis::{LuaPropertyOwnerId, LuaType, RenderLevel};
