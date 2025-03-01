@@ -13,11 +13,12 @@ pub(crate) fn analyze(db: &mut DbIndex, context: &mut AnalyzeContext) {
     let tree_list = context.tree_list.clone();
     // build decl and ref flow chain
     for in_filed_tree in &tree_list {
-        flow_analyze(db, in_filed_tree.file_id, in_filed_tree.value.clone());
+        local_flow_analyze(db, in_filed_tree.file_id, in_filed_tree.value.clone());
     }
 }
 
-fn flow_analyze(db: &mut DbIndex, file_id: FileId, root: LuaChunk) -> Option<()> {
+// local analyze
+fn local_flow_analyze(db: &mut DbIndex, file_id: FileId, root: LuaChunk) -> Option<()> {
     let references_index = db.get_reference_index();
     let refs_map = references_index.get_decl_references_map(&file_id)?.clone();
 
@@ -52,6 +53,8 @@ fn flow_analyze(db: &mut DbIndex, file_id: FileId, root: LuaChunk) -> Option<()>
 
     Some(())
 }
+
+// todo self analyze
 
 #[derive(Debug)]
 struct FlowAnalyzer<'a> {
