@@ -2,6 +2,7 @@ use emmylua_parser::{LuaAstNode, LuaKind, LuaNameExpr, LuaSyntaxKind, LuaTokenKi
 use lsp_types::{CompletionItem, CompletionItemLabelDetails, InsertTextFormat, InsertTextMode};
 
 use crate::handlers::completion::{
+    add_completions::match_keyword,
     completion_builder::CompletionBuilder,
     data::{KEYWORD_COMPLETIONS, KEYWORD_EXPR_COMPLETIONS},
 };
@@ -55,6 +56,10 @@ fn add_stat_keyword_completions(
         }
     }
     for keyword_info in KEYWORD_COMPLETIONS {
+        if !match_keyword(builder.trigger_token.text(), keyword_info.label) {
+            continue;
+        }
+
         let item = CompletionItem {
             label: keyword_info.label.to_string(),
             kind: Some(keyword_info.kind),
@@ -76,6 +81,9 @@ fn add_stat_keyword_completions(
 
 fn add_expr_keyword_completions(builder: &mut CompletionBuilder) -> Option<()> {
     for keyword_info in KEYWORD_EXPR_COMPLETIONS {
+        if !match_keyword(builder.trigger_token.text(), keyword_info.label) {
+            continue;
+        }
         let item = CompletionItem {
             label: keyword_info.label.to_string(),
             kind: Some(keyword_info.kind),
