@@ -1,6 +1,9 @@
+use std::collections::HashSet;
+
 use emmylua_code_analysis::{
-    DbIndex, LuaFunctionType, LuaMember, LuaMemberKey, LuaMemberOwner, LuaPropertyOwnerId,
-    LuaSignature, LuaSignatureId, LuaType, RenderLevel,
+    DbIndex, LuaDocReturnInfo, LuaFunctionType, LuaMember, LuaMemberKey, LuaMemberOwner,
+    LuaMultiLineUnion, LuaPropertyOwnerId, LuaSignature, LuaSignatureId, LuaType, LuaUnionType,
+    RenderLevel,
 };
 
 use emmylua_code_analysis::humanize_type;
@@ -202,7 +205,7 @@ fn hover_signature_type(
             })
             .collect::<Vec<_>>()
             .join(", ");
-        let rets = get_signature_rets_string(db, signature, builder.is_completion, None);
+        let rets = build_signature_rets(builder, signature, builder.is_completion, None);
         let result = format_function_type(type_label, async_label, full_name.clone(), params, rets);
         // 由于 @field 定义的`docfunction`会被视为`signature`, 因此这里额外处理
         if let Some(call_signature) = &call_signature {
@@ -234,7 +237,7 @@ fn hover_signature_type(
                 .collect::<Vec<_>>()
                 .join(", ");
             let rets =
-                get_signature_rets_string(db, signature, builder.is_completion, Some(overload));
+                build_signature_rets(builder, signature, builder.is_completion, Some(overload));
             let result =
                 format_function_type(type_label, async_label, full_name.clone(), params, rets);
 
@@ -258,12 +261,13 @@ fn hover_signature_type(
     Some(())
 }
 
-fn get_signature_rets_string(
-    db: &DbIndex,
+fn build_signature_rets(
+    builder: &mut HoverBuilder,
     signature: &LuaSignature,
     is_completion: bool,
     overload: Option<&LuaFunctionType>,
 ) -> String {
+    let db = builder.semantic_model.get_db();
     let mut result = String::new();
     // overload 的返回值固定为单行
     let overload_rets_string = if let Some(overload) = overload {
@@ -282,6 +286,35 @@ fn get_signature_rets_string(
         "".to_string()
     };
 
+    fn build_signature_ret_type(
+        builder: &mut HoverBuilder,
+        ret_info: &LuaDocReturnInfo,
+        i: usize,
+    ) -> String {
+        let type_expansion_count = builder.get_type_expansion_count();
+        let type_text =
+            hover_type(builder, &ret_info.type_ref, Some(RenderLevel::Simple)).unwrap_or_default();
+        if builder.get_type_expansion_count() > type_expansion_count {
+            // 重新设置`type_expansion`
+            if let Some(pop_type_expansion) =
+                builder.pop_type_expansion(type_expansion_count, builder.get_type_expansion_count())
+            {
+                let mut new_type_expansion = format!("return #{}", i + 1);
+                let mut seen = HashSet::new();
+                for type_expansion in pop_type_expansion {
+                    for line in type_expansion.lines().skip(1) {
+                        if seen.insert(line.to_string()) {
+                            new_type_expansion.push('\n');
+                            new_type_expansion.push_str(line);
+                        }
+                    }
+                }
+                builder.add_type_expansion(new_type_expansion);
+            }
+        };
+        type_text
+    }
+
     if is_completion {
         let rets = if !overload_rets_string.is_empty() {
             overload_rets_string
@@ -293,7 +326,8 @@ fn get_signature_rets_string(
                 format!(
                     " -> {}",
                     rets.iter()
-                        .map(|ret| humanize_type(db, &ret.type_ref, RenderLevel::Simple))
+                        .enumerate()
+                        .map(|(i, ret)| build_signature_ret_type(builder, ret, i))
                         .collect::<Vec<_>>()
                         .join(", ")
                 )
@@ -308,25 +342,20 @@ fn get_signature_rets_string(
             if rets.is_empty() {
                 "".to_string()
             } else {
-                let mut rets_string_multiline = String::with_capacity(512); // 预分配容量
+                let mut rets_string_multiline = String::new();
                 rets_string_multiline.push_str("\n");
 
                 for (i, ret) in rets.iter().enumerate() {
-                    let type_text = humanize_type(db, &ret.type_ref, RenderLevel::Simple);
+                    let type_text = build_signature_ret_type(builder, ret, i);
                     let prefix = if i == 0 {
                         "->".to_string()
                     } else {
                         format!("{}.", i + 1)
                     };
                     let name = ret.name.clone().unwrap_or_default();
-                    let detail = ret
-                        .description
-                        .as_ref()
-                        .map(|desc| format!(" — {}", desc.trim_end()))
-                        .unwrap_or_default();
 
                     rets_string_multiline.push_str(&format!(
-                        "  {}{} {}{}\n",
+                        "  {}{} {}\n",
                         prefix,
                         if !name.is_empty() {
                             format!("{}:", name)
@@ -334,7 +363,6 @@ fn get_signature_rets_string(
                             "".to_string()
                         },
                         type_text,
-                        detail
                     ));
                 }
                 rets_string_multiline
@@ -358,4 +386,106 @@ fn format_function_type(
         format!("{}{}", type_label, async_label)
     };
     format!("{}{}({}){}", prefix, full_name, params, rets)
+}
+
+/// 有限的处理
+pub fn hover_type(
+    builder: &mut HoverBuilder,
+    ty: &LuaType,
+    fallback_level: Option<RenderLevel>, // 当有值时, 若获取类型描述为空会回退到使用`humanize_type()`
+) -> Option<String> {
+    let db = builder.semantic_model.get_db();
+    let type_text = match ty {
+        LuaType::Ref(type_decl_id) => {
+            let type_decl = db.get_type_index().get_type_decl(type_decl_id)?;
+
+            if type_decl.is_alias() {
+                let origin = type_decl.get_alias_origin(db, None);
+                match origin {
+                    Some(LuaType::MultiLineUnion(multi_union)) => hover_multi_line_union_type(
+                        builder,
+                        db,
+                        multi_union.as_ref(),
+                        Some(type_decl.get_full_name()),
+                    ),
+                    _ => None,
+                }
+            } else {
+                None
+            }
+        }
+        LuaType::MultiLineUnion(multi_union) => {
+            hover_multi_line_union_type(builder, db, multi_union.as_ref(), None)
+        }
+        LuaType::Union(union) => Some(hover_union_type(builder, union, RenderLevel::Detailed)),
+        _ => None,
+    };
+    match (fallback_level, type_text) {
+        (Some(level), Some(text)) if text.is_empty() => Some(humanize_type(db, ty, level)),
+        (Some(level), None) => Some(humanize_type(db, ty, level)),
+        (_, text) => text,
+    }
+}
+
+fn hover_union_type(
+    builder: &mut HoverBuilder,
+    union: &LuaUnionType,
+    level: RenderLevel,
+) -> String {
+    let types = union.get_types();
+    let num = match level {
+        RenderLevel::Detailed => 10,
+        RenderLevel::Simple => 8,
+        RenderLevel::Normal => 4,
+        RenderLevel::Brief => 2,
+        RenderLevel::Minimal => {
+            return "union<...>".to_string();
+        }
+    };
+    let type_str = types
+        .iter()
+        .take(num)
+        .filter_map(|ty| hover_type(builder, ty, None))
+        .collect::<Vec<_>>()
+        .join("|");
+    if type_str.is_empty() {
+        return "".to_string();
+    }
+    let dots = if types.len() > num { "..." } else { "" };
+    format!("({}{})", type_str, dots)
+}
+
+fn hover_multi_line_union_type(
+    builder: &mut HoverBuilder,
+    db: &DbIndex,
+    multi_union: &LuaMultiLineUnion,
+    ty_name: Option<&str>,
+) -> Option<String> {
+    let members = multi_union.get_unions();
+    let type_name = if ty_name.is_none() {
+        let members = multi_union.get_unions();
+        let type_str = members
+            .iter()
+            .take(10)
+            .map(|(ty, _)| humanize_type(db, ty, RenderLevel::Simple))
+            .collect::<Vec<_>>()
+            .join("|");
+        Some(format!("({})", type_str))
+    } else {
+        ty_name.map(|name| name.to_string())
+    };
+    let mut text = format!("{}:\n", type_name.clone().unwrap_or_default());
+    for (typ, description) in members {
+        let type_humanize_text = humanize_type(db, &typ, RenderLevel::Minimal);
+        if let Some(description) = description {
+            text.push_str(&format!(
+                "    | {} -- {}\n",
+                type_humanize_text, description
+            ));
+        } else {
+            text.push_str(&format!("    | {}\n", type_humanize_text));
+        }
+    }
+    builder.add_type_expansion(text);
+    type_name
 }

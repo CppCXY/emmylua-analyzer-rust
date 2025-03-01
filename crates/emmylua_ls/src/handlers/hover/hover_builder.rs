@@ -21,6 +21,8 @@ pub struct HoverBuilder<'a> {
     pub signature_overload: Option<Vec<MarkedString>>,
     /// 注释描述, 包含函数参数与返回值描述
     pub annotation_description: Vec<MarkedString>,
+    /// 类型展开, 常用于 alias 类型
+    pub type_expansion: Option<Vec<String>>,
 
     pub is_completion: bool,
     trigger_token: Option<LuaSyntaxToken>,
@@ -41,6 +43,7 @@ impl<'a> HoverBuilder<'a> {
             annotation_description: Vec::new(),
             is_completion,
             trigger_token: token,
+            type_expansion: None,
         }
     }
 
@@ -52,12 +55,14 @@ impl<'a> HoverBuilder<'a> {
     pub fn set_location_path(&mut self, owner_member: Option<&LuaMember>) {
         if let Some(owner_member) = owner_member {
             if let LuaMemberOwner::Type(ty) = &owner_member.get_owner() {
-                self.location_path = Some(MarkedString::from_markdown(format!(
-                    "{}{} `{}`",
-                    "&nbsp;&nbsp;",
-                    "in class",
-                    ty.get_name()
-                )));
+                if ty.get_name() != ty.get_simple_name() {
+                    self.location_path = Some(MarkedString::from_markdown(format!(
+                        "{}{} `{}`",
+                        "&nbsp;&nbsp;",
+                        "in class",
+                        ty.get_name()
+                    )));
+                }
             }
         }
     }
@@ -73,6 +78,34 @@ impl<'a> HoverBuilder<'a> {
                 "lua".to_string(),
                 signature_overload,
             ));
+    }
+
+    pub fn add_type_expansion(&mut self, type_expansion: String) {
+        if self.type_expansion.is_none() {
+            self.type_expansion = Some(Vec::new());
+        }
+        self.type_expansion
+            .as_mut()
+            .unwrap()
+            .push(type_expansion);
+    }
+
+    pub fn get_type_expansion_count(&self) -> usize {
+        if let Some(type_expansion) = &self.type_expansion {
+            type_expansion.len()
+        } else {
+            0
+        }
+    }
+
+    pub fn pop_type_expansion(&mut self, start: usize, end: usize) -> Option<Vec<String>> {
+        if let Some(type_expansion) = &mut self.type_expansion {
+            let mut result = Vec::new();
+            result.extend(type_expansion.drain(start..end));
+            Some(result)
+        } else {
+            None
+        }
     }
 
     pub fn add_annotation_description(&mut self, annotation_description: String) {
@@ -100,10 +133,8 @@ impl<'a> HoverBuilder<'a> {
                 {
                     if let LuaMemberOwner::Type(ty) = &member.get_owner() {
                         if is_std_by_name(&ty.get_name()) {
-                            let std_desc = hover_std_description(
-                                ty.get_name(),
-                                member.get_key().get_name(),
-                            );
+                            let std_desc =
+                                hover_std_description(ty.get_name(), member.get_key().get_name());
                             if !std_desc.is_empty() {
                                 description = std_desc;
                             }
@@ -112,12 +143,11 @@ impl<'a> HoverBuilder<'a> {
                 }
             }
             LuaPropertyOwnerId::LuaDecl(id) => {
-                if let Some(decl) =
-                    self.semantic_model.get_db().get_decl_index().get_decl(&id)
-                {
+                if let Some(decl) = self.semantic_model.get_db().get_decl_index().get_decl(&id) {
                     if decl.is_global()
                         && is_std_by_name(&decl.get_name())
-                        && is_std_by_path(self.semantic_model.get_db(), decl.get_file_id()).is_some()
+                        && is_std_by_path(self.semantic_model.get_db(), decl.get_file_id())
+                            .is_some()
                     {
                         let std_desc = hover_std_description(decl.get_name(), None);
                         if !std_desc.is_empty() {
@@ -140,13 +170,11 @@ impl<'a> HoverBuilder<'a> {
                 &mut self.annotation_description,
                 signature_id,
             );
-            if self.is_completion {
-                add_signature_ret_description(
-                    &self.semantic_model.get_db(),
-                    &mut self.annotation_description,
-                    signature_id,
-                );
-            }
+            add_signature_ret_description(
+                &self.semantic_model.get_db(),
+                &mut self.annotation_description,
+                signature_id,
+            );
         }
     }
 
@@ -227,6 +255,12 @@ impl<'a> HoverBuilder<'a> {
                         result.push_str(&format!("\n```{}\n{}\n```\n", s.language, s.value));
                     }
                 }
+            }
+        }
+
+        if let Some(type_expansion) = &self.type_expansion {
+            for type_expansion in type_expansion {
+                result.push_str(&format!("\n```{}\n{}\n```\n", "lua", type_expansion));
             }
         }
 

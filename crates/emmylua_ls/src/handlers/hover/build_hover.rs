@@ -7,6 +7,8 @@ use lsp_types::{Hover, HoverContents, MarkedString, MarkupContent};
 
 use emmylua_code_analysis::humanize_type;
 
+use crate::handlers::hover::hover_humanize::hover_type;
+
 use super::{
     hover_builder::HoverBuilder,
     hover_humanize::{hover_const_type, hover_function_type},
@@ -106,8 +108,7 @@ fn build_decl_hover(
 
     // 处理类型签名
     if typ.is_function() {
-        let property_owner: Option<LuaPropertyOwnerId> =
-            get_decl_owner(builder.semantic_model, decl_id.clone());
+        let property_owner = get_decl_owner(builder.semantic_model, decl_id.clone());
         match property_owner {
             Some(LuaPropertyOwnerId::Member(member_id)) => {
                 owner_member = Some(db.get_member_index().get_member(&member_id).unwrap());
@@ -139,7 +140,8 @@ fn build_decl_hover(
         };
         builder.set_type_description(format!("{}{}: {}", prefix, decl.get_name(), const_value));
     } else {
-        let type_humanize_text = humanize_type(db, &typ, RenderLevel::Detailed);
+        let type_humanize_text =
+            hover_type(builder, &typ, Some(RenderLevel::Detailed)).unwrap_or_default();
         let prefix = if decl.is_local() {
             "local "
         } else {
@@ -231,9 +233,12 @@ fn build_member_hover(
     } else if typ.is_const() {
         let const_value = hover_const_type(db, &typ);
         builder.set_type_description(format!("(field) {}: {}", member_name, const_value));
+        builder.set_location_path(Some(&member));
     } else {
-        let type_humanize_text = humanize_type(db, &typ, RenderLevel::Simple);
+        let type_humanize_text =
+            hover_type(builder, &typ, Some(RenderLevel::Simple)).unwrap_or_default();
         builder.set_type_description(format!("(field) {}: {}", member_name, type_humanize_text));
+        builder.set_location_path(Some(&member));
     }
 
     builder.add_annotation_description("---".to_string());
@@ -259,7 +264,7 @@ fn build_type_decl_hover(
     let type_description = if type_decl.is_alias() {
         if let Some(origin) = type_decl.get_alias_origin(db, None) {
             let origin_type = humanize_type(db, &origin, RenderLevel::Detailed);
-            format!("(type alias) {} = {}", type_decl.get_name(), origin_type)
+            format!("(alias) {} = {}", type_decl.get_name(), origin_type)
         } else {
             "".to_string()
         }
