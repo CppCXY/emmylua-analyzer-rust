@@ -101,17 +101,17 @@ pub async fn init_analysis(
     let mut workspace_folders = workspace_folders;
     for workspace_root in &workspace_folders {
         info!("add workspace root: {:?}", workspace_root);
-        mut_analysis.add_workspace_root(workspace_root.clone());
+        mut_analysis.add_main_workspace(workspace_root.clone());
     }
 
     for workspace_root in &emmyrc.workspace.workspace_roots {
         info!("add workspace root: {:?}", workspace_root);
-        mut_analysis.add_workspace_root(PathBuf::from_str(workspace_root).unwrap());
+        mut_analysis.add_main_workspace(PathBuf::from_str(workspace_root).unwrap());
     }
 
     for lib in &emmyrc.workspace.library {
         info!("add library: {:?}", lib);
-        mut_analysis.add_workspace_root(PathBuf::from_str(lib).unwrap());
+        mut_analysis.add_library_workspace(PathBuf::from_str(lib).unwrap());
         workspace_folders.push(PathBuf::from_str(lib).unwrap());
     }
 

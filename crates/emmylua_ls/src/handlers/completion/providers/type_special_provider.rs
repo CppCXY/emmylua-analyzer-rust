@@ -18,8 +18,8 @@ pub fn add_completion(builder: &mut CompletionBuilder) -> Option<()> {
         return None;
     }
 
-    let typs = get_token_should_type(builder)?;
-    for typ in typs {
+    let types = get_token_should_type(builder)?;
+    for typ in types {
         dispatch_type(builder, typ, &mut InferGuard::new());
     }
     Some(())

@@ -219,7 +219,7 @@ fn humanize_multi_line_union_type(
         let type_humanize_text = humanize_type(db, &typ, RenderLevel::Minimal);
         if let Some(description) = description {
             text.push_str(&format!(
-                "    | {}  --{}\n",
+                "    | {} -- {}\n",
                 type_humanize_text, description
             ));
         } else {

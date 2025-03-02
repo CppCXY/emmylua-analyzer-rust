@@ -10,17 +10,19 @@ use crate::markdown_generator::{
     escape_type_name, mod_gen::generate_member_owner_module, IndexStruct,
 };
 
-use super::{render::{render_const_type, render_function_type}, MkdocsIndex};
+use super::{
+    render::{render_const_type, render_function_type},
+    MkdocsIndex,
+};
 
 pub fn generate_global_markdown(
     db: &DbIndex,
     tl: &Tera,
     decl_id: &LuaDeclId,
-    input: &Path,
     output: &Path,
     mkdocs_index: &mut MkdocsIndex,
 ) -> Option<()> {
-    check_filter(db, decl_id, input)?;
+    check_filter(db, decl_id)?;
 
     let mut context = tera::Context::new();
     let decl = db.get_decl_index().get_decl(decl_id)?;
@@ -65,10 +67,10 @@ pub fn generate_global_markdown(
     Some(())
 }
 
-fn check_filter(db: &DbIndex, decl_id: &LuaDeclId, workspace: &Path) -> Option<()> {
+fn check_filter(db: &DbIndex, decl_id: &LuaDeclId) -> Option<()> {
     let file_id = decl_id.file_id;
-    let file_path = db.get_vfs().get_file_path(&file_id)?;
-    if !file_path.starts_with(workspace) {
+    let module = db.get_module_index().get_module(file_id)?;
+    if !module.workspace_id.is_main() {
         return None;
     }
 

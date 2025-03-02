@@ -59,17 +59,7 @@ pub fn hover_std_description(type_name: &str, member_name: Option<&str>) -> Stri
     meta_std(type_name, member_name)
 }
 
-pub fn is_std_by_path(db: &DbIndex, file_id: FileId) -> Option<()> {
-    let mut resources_std_path = PathBuf::from(env::current_exe().unwrap().parent().unwrap());
-    resources_std_path.push("resources");
-    resources_std_path.push("std");
-    if db
-        .get_vfs()
-        .get_file_path(&file_id)?
-        .starts_with(resources_std_path)
-    {
-        Some(())
-    } else {
-        None
-    }
+pub fn is_std_by_path(db: &DbIndex, file_id: FileId) -> Option<bool> {
+    let module_info = db.get_module_index().get_module(file_id)?;
+    Some(module_info.workspace_id.is_std())
 }

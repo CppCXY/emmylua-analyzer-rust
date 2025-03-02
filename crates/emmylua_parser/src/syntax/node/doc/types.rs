@@ -20,7 +20,7 @@ pub enum LuaDocType {
     Nullable(LuaDocNullableType),
     Generic(LuaDocGenericType),
     StrTpl(LuaDocStrTplType),
-    MultiLineUnion(LuaDocMultiLineUnionType)
+    MultiLineUnion(LuaDocMultiLineUnionType),
 }
 
 impl LuaAstNode for LuaDocType {
@@ -96,9 +96,9 @@ impl LuaAstNode for LuaDocType {
             LuaSyntaxKind::TypeStringTemplate => {
                 Some(LuaDocType::StrTpl(LuaDocStrTplType::cast(syntax)?))
             }
-            LuaSyntaxKind::TypeMultiLineUnion => {
-                Some(LuaDocType::MultiLineUnion(LuaDocMultiLineUnionType::cast(syntax)?))
-            }
+            LuaSyntaxKind::TypeMultiLineUnion => Some(LuaDocType::MultiLineUnion(
+                LuaDocMultiLineUnionType::cast(syntax)?,
+            )),
             _ => None,
         }
     }
@@ -647,7 +647,6 @@ impl LuaDocStrTplType {
         Some(str_tpl.syntax().text().trim_matches('`').to_string())
     }
 }
-
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct LuaDocMultiLineUnionType {

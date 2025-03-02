@@ -1,12 +1,14 @@
 mod module_info;
 mod module_node;
 mod test;
+mod workspace;
 
 use emmylua_parser::LuaVersionCondition;
 use log::{error, info};
 pub use module_info::ModuleInfo;
 use module_node::{ModuleNode, ModuleNodeId};
 use regex::Regex;
+pub use workspace::{Workspace, WorkspaceId};
 
 use super::traits::LuaIndex;
 use crate::{Emmyrc, FileId};
@@ -23,7 +25,7 @@ pub struct LuaModuleIndex {
     module_nodes: HashMap<ModuleNodeId, ModuleNode>,
     file_module_map: HashMap<FileId, ModuleInfo>,
     module_name_to_file_ids: HashMap<String, Vec<FileId>>,
-    workspace_root: Vec<PathBuf>,
+    workspaces: Vec<Workspace>,
     id_counter: u32,
     fuzzy_search: bool,
     module_replace_vec: Vec<(Regex, String)>,
@@ -37,7 +39,7 @@ impl LuaModuleIndex {
             module_nodes: HashMap::new(),
             file_module_map: HashMap::new(),
             module_name_to_file_ids: HashMap::new(),
-            workspace_root: Vec::new(),
+            workspaces: Vec::new(),
             id_counter: 1,
             fuzzy_search: false,
             module_replace_vec: Vec::new(),
@@ -91,24 +93,26 @@ impl LuaModuleIndex {
         );
     }
 
-    pub fn add_module_by_path(&mut self, file_id: FileId, path: &str) -> Option<()> {
+    pub fn add_module_by_path(&mut self, file_id: FileId, path: &str) -> Option<WorkspaceId> {
         if self.file_module_map.contains_key(&file_id) {
             self.remove(file_id);
         }
 
-        let module_path = self.extract_module_path(&path)?;
+        let (module_path, workspace_id) = self.extract_module_path(&path)?;
         let mut module_path = module_path.replace(['\\', '/'], ".");
         if !self.module_replace_vec.is_empty() {
             module_path = self.replace_module_path(&module_path);
         }
 
-        self.add_module_by_module_path(file_id, module_path)
+        self.add_module_by_module_path(file_id, module_path, workspace_id);
+        Some(workspace_id)
     }
 
     pub fn add_module_by_module_path(
         &mut self,
         file_id: FileId,
         module_path: String,
+        workspace_id: WorkspaceId
     ) -> Option<()> {
         if self.file_module_map.contains_key(&file_id) {
             self.remove(file_id);
@@ -161,6 +165,7 @@ impl LuaModuleIndex {
             visible: true,
             export_type: None,
             version_conds: None,
+            workspace_id,
         };
 
         self.file_module_map.insert(file_id, module_info);
@@ -282,18 +287,21 @@ impl LuaModuleIndex {
         self.file_module_map.values().collect()
     }
 
-    fn extract_module_path(&self, path: &str) -> Option<String> {
+    fn extract_module_path(&self, path: &str) -> Option<(String, WorkspaceId)> {
         let path = Path::new(path);
-        let mut matched_module_path: Option<String> = None;
-        for root in &self.workspace_root {
-            if let Ok(relative_path) = path.strip_prefix(root) {
+        let mut matched_module_path: Option<(String, WorkspaceId)> = None;
+        for workspace in &self.workspaces {
+            if let Ok(relative_path) = path.strip_prefix(&workspace.root) {
                 let relative_path_str = relative_path.to_str().unwrap_or("");
                 let module_path = self.match_pattern(relative_path_str);
-                if matched_module_path.is_none() {
-                    matched_module_path = module_path;
-                } else if let Some(module_path) = module_path {
-                    if module_path.len() < matched_module_path.as_ref().unwrap().len() {
-                        matched_module_path = Some(module_path);
+                if let Some(module_path) = module_path {
+                    if matched_module_path.is_none() {
+                        matched_module_path = Some((module_path, workspace.id));
+                    } else {
+                        let (matched, _) = matched_module_path.as_ref().unwrap();
+                        if module_path.len() > matched.len() {
+                            matched_module_path = Some((module_path, workspace.id));
+                        }
                     }
                 }
             }
@@ -322,13 +330,13 @@ impl LuaModuleIndex {
         None
     }
 
-    pub fn add_workspace_root(&mut self, root: PathBuf) {
-        self.workspace_root.push(root);
+    pub fn add_workspace_root(&mut self, root: PathBuf, workspace_id: WorkspaceId) {
+        self.workspaces.push(Workspace::new(root, workspace_id));
     }
 
     #[allow(unused)]
     pub fn remove_workspace_root(&mut self, root: &Path) {
-        self.workspace_root.retain(|r| r != root);
+        self.workspaces.retain(|r| r.root != root);
     }
 
     pub fn update_config(&mut self, config: Arc<Emmyrc>) {

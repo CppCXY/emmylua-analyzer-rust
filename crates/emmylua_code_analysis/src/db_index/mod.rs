@@ -20,11 +20,11 @@ pub use flow::{LuaFlowChain, LuaFlowIndex};
 pub use member::{LuaMember, LuaMemberId, LuaMemberIndex, LuaMemberKey, LuaMemberOwner};
 use meta::MetaFile;
 use module::LuaModuleIndex;
-pub use module::ModuleInfo;
+pub use module::{ModuleInfo, WorkspaceId};
 pub use operators::{LuaOperator, LuaOperatorId, LuaOperatorIndex, LuaOperatorMetaMethod};
 pub use property::{LuaPropertyId, LuaPropertyIndex, LuaPropertyOwnerId};
 pub use r#type::*;
-pub use reference::{LuaReferenceIndex, DeclReference};
+pub use reference::{DeclReference, LuaReferenceIndex};
 pub use signature::*;
 use traits::LuaIndex;
 

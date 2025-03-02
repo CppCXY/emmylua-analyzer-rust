@@ -18,11 +18,10 @@ pub fn generate_type_markdown(
     db: &DbIndex,
     tl: &Tera,
     typ: &LuaTypeDecl,
-    input: &Path,
     output: &Path,
     mkdocs_index: &mut MkdocsIndex,
 ) -> Option<()> {
-    check_filter(db, typ, input)?;
+    check_filter(db, typ)?;
     let mut context = tera::Context::new();
     let typ_name = typ.get_name();
     context.insert("type_name", &typ_name);
@@ -37,17 +36,17 @@ pub fn generate_type_markdown(
     Some(())
 }
 
-fn check_filter(db: &DbIndex, typ: &LuaTypeDecl, workspace: &Path) -> Option<()> {
+fn check_filter(db: &DbIndex, typ: &LuaTypeDecl) -> Option<()> {
     let location = typ.get_locations();
     for loc in location {
         let file_id = loc.file_id;
-        let file_path = db.get_vfs().get_file_path(&file_id)?;
-        if !file_path.starts_with(&workspace) {
-            return None;
+        let module = db.get_module_index().get_module(file_id)?;
+        if module.workspace_id.is_main() {
+            return Some(());
         }
     }
 
-    Some(())
+    None
 }
 
 fn generate_class_type_markdown(
@@ -112,7 +111,8 @@ fn generate_class_type_markdown(
             };
 
             let name = match member_name {
-                LuaMemberKey::Name(name) => name,
+                LuaMemberKey::Name(name) => name.to_string(),
+                LuaMemberKey::Integer(i) => format!("[{}]", i),
                 _ => continue,
             };
 
@@ -307,8 +307,8 @@ fn generate_alias_type_markdown(
     }
 
     if let Some(origin_typ) = typ.get_alias_origin(db, None) {
-        let origin_typ_display = humanize_type(db, &origin_typ, RenderLevel::Detailed);
-        let display = format!("```lua\n(alias) {} = {}\n```\n", typ_name, origin_typ_display);
+        let origin_type_display = humanize_type(db, &origin_typ, RenderLevel::Detailed);
+        let display = format!("```lua\n(alias) {} = {}\n```\n", typ_name, origin_type_display);
         context.insert("origin_type", &display);
     }
 
