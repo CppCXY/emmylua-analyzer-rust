@@ -1,32 +1,64 @@
 use emmylua_parser::{
     BinaryOperator, LuaAst, LuaAstNode, LuaBinaryExpr, LuaBlock, LuaCallArgList, LuaCallExpr,
-    LuaExpr, LuaLiteralToken, LuaNameExpr, LuaStat, LuaSyntaxKind, PathTrait, UnaryOperator,
+    LuaExpr, LuaIndexExpr, LuaLiteralToken, LuaNameExpr, LuaStat, LuaSyntaxKind, PathTrait,
+    UnaryOperator,
 };
 use rowan::TextRange;
 
-use crate::db_index::{LuaFlowChain, LuaType, TypeAssertion};
+use crate::{
+    db_index::{LuaType, TypeAssertion},
+    LuaTypeDeclId,
+};
 
 use super::FlowAnalyzer;
 
-pub fn infer_name_expr(
-    analyzer: &FlowAnalyzer,
-    flow_chains: &mut LuaFlowChain,
-    name_expr: LuaNameExpr,
-) -> Option<()> {
+pub fn infer_name_expr(analyzer: &mut FlowAnalyzer, name_expr: LuaNameExpr) -> Option<()> {
     let parent = name_expr.get_parent::<LuaAst>()?;
+    match &parent {
+        LuaAst::LuaIndexExpr(_) => return None,
+        LuaAst::LuaAssignStat(_) => {
+
+        }
+        _ => {}
+    }
+
+    let path = name_expr.get_access_path()?;
     broadcast_up(
         analyzer,
-        flow_chains,
+        &path,
         parent,
         LuaAst::LuaNameExpr(name_expr),
         TypeAssertion::Exist,
     );
+
+    Some(())
+}
+
+pub fn infer_index_expr(analyzer: &mut FlowAnalyzer, index_expr: LuaIndexExpr) -> Option<()> {
+    let parent = index_expr.get_parent::<LuaAst>()?;
+    match &parent {
+        LuaAst::LuaIndexExpr(_) => return None,
+        LuaAst::LuaAssignStat(_) => {
+            
+        }
+        _ => {}
+    }
+
+    let path = index_expr.get_access_path()?;
+    broadcast_up(
+        analyzer,
+        &path,
+        parent,
+        LuaAst::LuaIndexExpr(index_expr),
+        TypeAssertion::Exist,
+    );
+
     Some(())
 }
 
 fn broadcast_up(
-    analyzer: &FlowAnalyzer,
-    flow_chains: &mut LuaFlowChain,
+    analyzer: &mut FlowAnalyzer,
+    path: &str,
     parent: LuaAst,
     origin: LuaAst,
     type_assert: TypeAssertion,
@@ -35,20 +67,20 @@ fn broadcast_up(
         LuaAst::LuaIfStat(if_stat) => {
             // this mean the name_expr is a condition and the name_expr is not nil and is not false
             if let Some(block) = if_stat.get_block() {
-                flow_chains.add_type_assert(type_assert.clone(), block.get_range());
+                analyzer.add_type_assert(path, type_assert.clone(), block.get_range());
             }
 
             if let Some(ne_type_assert) = type_assert.get_negation() {
                 if let Some(else_stat) = if_stat.get_else_clause() {
                     let range = else_stat.get_range();
-                    flow_chains.add_type_assert(ne_type_assert, range);
+                    analyzer.add_type_assert(path, ne_type_assert, range);
                 } else if is_block_has_return(if_stat.get_block()?).unwrap_or(false) {
                     let parent_block = if_stat.get_parent::<LuaBlock>()?;
                     let parent_range = parent_block.get_range();
                     let if_range = if_stat.get_range();
                     if if_range.end() < parent_range.end() {
                         let range = TextRange::new(if_range.end(), parent_range.end());
-                        flow_chains.add_type_assert(ne_type_assert, range);
+                        analyzer.add_type_assert(path, ne_type_assert, range);
                     }
                 }
             }
@@ -56,12 +88,12 @@ fn broadcast_up(
         LuaAst::LuaWhileStat(while_stat) => {
             // this mean the name_expr is a condition and the name_expr is not nil and is not false
             let block = while_stat.get_block()?;
-            flow_chains.add_type_assert(type_assert, block.get_range());
+            analyzer.add_type_assert(path, type_assert, block.get_range());
         }
         LuaAst::LuaElseIfClauseStat(else_if_clause_stat) => {
             // this mean the name_expr is a condition and the name_expr is not nil and is not false
             let block = else_if_clause_stat.get_block()?;
-            flow_chains.add_type_assert(type_assert, block.get_range());
+            analyzer.add_type_assert(path, type_assert, block.get_range());
         }
         LuaAst::LuaIndexExpr(index_expr) => {
             if index_expr.get_position() != origin.get_position() {
@@ -73,7 +105,7 @@ fn broadcast_up(
             let type_assert = TypeAssertion::MemberPathExist(member_path.into());
             broadcast_up(
                 analyzer,
-                flow_chains,
+                path,
                 index_expr.get_parent::<LuaAst>()?,
                 LuaAst::LuaIndexExpr(index_expr),
                 type_assert,
@@ -85,12 +117,12 @@ fn broadcast_up(
                 BinaryOperator::OpAnd => {
                     let (left, right) = binary_expr.get_exprs()?;
                     if left.get_position() == origin.get_position() {
-                        flow_chains.add_type_assert(type_assert.clone(), right.get_range());
+                        analyzer.add_type_assert(path, type_assert.clone(), right.get_range());
                     }
 
                     broadcast_up(
                         analyzer,
-                        flow_chains,
+                        path,
                         binary_expr.get_parent::<LuaAst>()?,
                         LuaAst::LuaBinaryExpr(binary_expr),
                         type_assert,
@@ -125,7 +157,7 @@ fn broadcast_up(
 
                         broadcast_up(
                             analyzer,
-                            flow_chains,
+                            path,
                             binary_expr.get_parent::<LuaAst>()?,
                             LuaAst::LuaBinaryExpr(binary_expr),
                             type_assert,
@@ -137,7 +169,7 @@ fn broadcast_up(
         }
         LuaAst::LuaCallArgList(call_args_list) => {
             if type_assert == TypeAssertion::Exist {
-                infer_call_arg_list(analyzer, flow_chains, call_args_list)?;
+                infer_call_arg_list(analyzer, path, call_args_list)?;
             }
         }
         LuaAst::LuaUnaryExpr(unary_expr) => {
@@ -147,7 +179,7 @@ fn broadcast_up(
                     if let Some(ne_type_assert) = type_assert.get_negation() {
                         broadcast_up(
                             analyzer,
-                            flow_chains,
+                            path,
                             unary_expr.get_parent::<LuaAst>()?,
                             LuaAst::LuaUnaryExpr(unary_expr),
                             ne_type_assert,
@@ -163,8 +195,8 @@ fn broadcast_up(
 }
 
 fn infer_call_arg_list(
-    analyzer: &FlowAnalyzer,
-    flow_chains: &mut LuaFlowChain,
+    analyzer: &mut FlowAnalyzer,
+    path: &str,
     call_arg: LuaCallArgList,
 ) -> Option<()> {
     let parent = call_arg.get_parent::<LuaAst>()?;
@@ -173,7 +205,7 @@ fn infer_call_arg_list(
             if let LuaExpr::NameExpr(prefix_expr) = call_expr.get_prefix_expr()? {
                 let name_text = prefix_expr.get_name_text()?;
                 if name_text == "type" {
-                    infer_lua_type_assert(analyzer, flow_chains, call_expr);
+                    infer_lua_type_assert(analyzer, path, call_expr);
                 }
             }
         }
@@ -184,8 +216,8 @@ fn infer_call_arg_list(
 }
 
 fn infer_lua_type_assert(
-    analyzer: &FlowAnalyzer,
-    flow_chains: &mut LuaFlowChain,
+    analyzer: &mut FlowAnalyzer,
+    path: &str,
     call_expr: LuaCallExpr,
 ) -> Option<()> {
     let binary_expr = call_expr.get_parent::<LuaBinaryExpr>()?;
@@ -218,14 +250,13 @@ fn infer_lua_type_assert(
         "thread" => TypeAssertion::Narrow(LuaType::Thread),
         "userdata" => TypeAssertion::Narrow(LuaType::Userdata),
         "nil" => TypeAssertion::Narrow(LuaType::Nil),
-        _ => {
-            return None;
-        }
+        // extend usage
+        str => TypeAssertion::Narrow(LuaType::Ref(LuaTypeDeclId::new(str))),
     };
 
     broadcast_up(
         analyzer,
-        flow_chains,
+        path,
         binary_expr.get_parent::<LuaAst>()?,
         LuaAst::LuaBinaryExpr(binary_expr),
         type_assert,

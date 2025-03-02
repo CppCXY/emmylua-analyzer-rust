@@ -16,7 +16,7 @@ use std::{collections::HashMap, sync::Arc};
 use crate::{Emmyrc, FileId, Vfs};
 pub use declaration::*;
 pub use diagnostic::{AnalyzeError, DiagnosticAction, DiagnosticActionKind, DiagnosticIndex};
-pub use flow::{LuaFlowChain, LuaFlowIndex};
+pub use flow::{LuaFlowChain, LuaFlowIndex, LuaFlowId};
 pub use member::{LuaMember, LuaMemberId, LuaMemberIndex, LuaMemberKey, LuaMemberOwner};
 use meta::MetaFile;
 use module::LuaModuleIndex;
