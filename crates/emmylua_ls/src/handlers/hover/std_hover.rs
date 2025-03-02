@@ -1,5 +1,3 @@
-use std::{env, path::PathBuf};
-
 use emmylua_code_analysis::{DbIndex, FileId};
 
 use crate::meta_text::meta_std;
