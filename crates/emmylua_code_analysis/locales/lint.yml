@@ -125,4 +125,7 @@ Cannot use `...` outside a vararg function.:
   en: 'Undefined field: `%{name}`'
   zh_CN: '未定义字段 `%{name}`'
   zh_HK: '未定義字段 `%{name}`'
-
+'Redefined local variable `%{name}`':
+  en: 'Redefined local variable `%{name}`'
+  zh_CN: '重定义局部变量 `%{name}`'
+  zh_HK: '重定義局部變量 `%{name}`'

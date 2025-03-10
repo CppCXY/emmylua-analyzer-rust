@@ -2,7 +2,7 @@ use emmylua_parser::{
     LuaAstNode, LuaAstToken, LuaBlock, LuaClosureExpr, LuaReturnStat, LuaTokenKind,
 };
 
-use crate::{DiagnosticCode, LuaSignatureId, SemanticModel, SignatureReturnStatus};
+use crate::{DiagnosticCode, LuaSignatureId, LuaType, SemanticModel, SignatureReturnStatus};
 
 use super::DiagnosticContext;
 
@@ -38,12 +38,20 @@ fn check_return_stat(
     if signature.resolve_return != SignatureReturnStatus::DocResolve {
         return None;
     }
+    if min_return_types.iter().any(|ty| ty.is_variadic()) {
+        return Some(());
+    }
 
-    let disable_return_count_check = min_return_types.iter().any(|ty| ty.is_variadic());
+    let expr_return_len = return_stat.get_expr_list().try_fold(0, |acc, expr| {
+        let expr_type = semantic_model.infer_expr(expr)?;
+        match expr_type {
+            LuaType::MuliReturn(types) => types.get_len().map(|len| acc + len as usize),
+            _ => Some(acc + 1),
+        }
+    })?;
 
-    let expr_return_len = return_stat.get_expr_list().collect::<Vec<_>>().len();
     let return_types_len = min_return_types.len();
-    if !disable_return_count_check && expr_return_len < return_types_len {
+    if expr_return_len < return_types_len {
         context.add_diagnostic(
             DiagnosticCode::MissingReturnValue,
             return_stat

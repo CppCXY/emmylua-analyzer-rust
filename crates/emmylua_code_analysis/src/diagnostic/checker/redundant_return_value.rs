@@ -1,6 +1,6 @@
 use emmylua_parser::{LuaAstNode, LuaBlock, LuaClosureExpr, LuaReturnStat};
 
-use crate::{DiagnosticCode, LuaSignatureId, SemanticModel, SignatureReturnStatus};
+use crate::{DiagnosticCode, LuaSignatureId, LuaType, SemanticModel, SignatureReturnStatus};
 
 use super::DiagnosticContext;
 
@@ -32,24 +32,39 @@ fn check_return_stat(
         return None;
     }
 
-    let disable_return_count_check = return_types.iter().any(|ty| ty.is_variadic());
-    let expr_return_len = return_stat.get_expr_list().collect::<Vec<_>>().len();
+    if return_types.iter().any(|ty| ty.is_variadic()) {
+        return Some(());
+    }
     let return_types_len = return_types.len();
 
-    for (idx, expr) in return_stat.get_expr_list().enumerate() {
-        if !disable_return_count_check && idx >= return_types_len {
-            context.add_diagnostic(
-                DiagnosticCode::RedundantReturnValue,
-                expr.get_range(),
-                t!(
+    let mut current_expr_len = 0;
+    let mut diagnostics = Vec::new();
+    for expr in return_stat.get_expr_list() {
+        let expr_type = semantic_model.infer_expr(expr.clone())?;
+        match expr_type {
+            LuaType::MuliReturn(types) => {
+                current_expr_len += types.get_len().map(|len| len as usize).unwrap_or(1);
+            }
+            _ => current_expr_len += 1,
+        };
+
+        if current_expr_len > return_types_len {
+            diagnostics.push(expr.get_range());
+        }
+    }
+
+    for range in diagnostics {
+        context.add_diagnostic(
+            DiagnosticCode::RedundantReturnValue,
+            range,
+            t!(
                     "Annotations specify that at most %{max} return value(s) are required, found %{rmax} returned here instead.",
                     max = return_types_len,
-                    rmax = expr_return_len
+                    rmax = current_expr_len
                 )
                 .to_string(),
                 None,
             );
-        }
     }
     Some(())
 }

@@ -54,7 +54,23 @@ fn check_return_stat(
             .infer_expr(expr.clone())
             .unwrap_or(LuaType::Any);
 
-        let result = semantic_model.type_check(&return_type, &expr_type);
+        let result = match &expr_type {
+            LuaType::MuliReturn(multi_return) => match multi_return.deref() {
+                LuaMultiReturn::Base(base) => semantic_model.type_check(&return_type, &base),
+                LuaMultiReturn::Multi(types) => {
+                    let mut result = Ok(());
+                    for t in types {
+                        result = semantic_model.type_check(&return_type, t);
+                        if !result.is_ok() {
+                            break;
+                        }
+                    }
+                    result
+                }
+            },
+            _ => semantic_model.type_check(&return_type, &expr_type),
+        };
+
         if !result.is_ok() {
             add_type_check_diagnostic(
                 context,

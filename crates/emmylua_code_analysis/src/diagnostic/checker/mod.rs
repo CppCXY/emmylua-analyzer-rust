@@ -9,6 +9,7 @@ mod missing_parameter;
 mod missing_return_value;
 mod need_check_nil;
 mod param_type_check;
+mod redefined_local;
 mod redundant_parameter;
 mod redundant_return_value;
 mod return_type_mismatch;
@@ -60,6 +61,7 @@ pub fn check_file(context: &mut DiagnosticContext, semantic_model: &SemanticMode
     check!(missing_return_value);
     check!(return_type_mismatch);
     check!(undefined_doc_param);
+    check!(redefined_local);
 
     Some(())
 }
