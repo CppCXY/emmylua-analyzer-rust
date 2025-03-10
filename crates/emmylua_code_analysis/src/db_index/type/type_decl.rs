@@ -22,6 +22,7 @@ flags! {
         Local,
         // Global,
         Partial,
+        Env,
         Exact
     }
 }
@@ -92,6 +93,14 @@ impl LuaTypeDecl {
 
     pub fn is_alias(&self) -> bool {
         matches!(&*self.extra, LuaTypeExtra::Alias { .. })
+    }
+
+    pub fn is_env(&self) -> bool {
+        if let Some(attrlib) = self.get_attrib() {
+            return attrlib.contains(LuaTypeAttribute::Env);
+        }
+        
+        false
     }
 
     pub fn get_attrib(&self) -> Option<FlagSet<LuaTypeAttribute>> {

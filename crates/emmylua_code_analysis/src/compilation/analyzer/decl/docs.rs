@@ -22,10 +22,22 @@ pub fn analyze_doc_tag_class(analyzer: &mut DeclAnalyzer, class: LuaDocTagClass)
     let r = analyzer.db.get_type_index_mut().add_type_decl(
         file_id,
         range,
-        name,
+        name.clone(),
         LuaDeclTypeKind::Class,
         attrib,
     );
+
+    if let Some(attrib) = attrib {
+        if attrib.contains(LuaTypeAttribute::Env) {
+            let r_add_env = analyzer.db.get_type_index_mut().add_file_env(file_id, name);
+            if let Err(e) = r_add_env {
+                analyzer.db.get_diagnostic_index_mut().add_diagnostic(
+                    file_id,
+                    AnalyzeError::new(DiagnosticCode::MultiEnv, &e, range),
+                );
+            }
+        }
+    }
 
     if let Err(e) = r {
         analyzer.db.get_diagnostic_index_mut().add_diagnostic(
@@ -51,6 +63,9 @@ fn get_attrib_value(attrib: Option<LuaDocAttribute>) -> Option<FlagSet<LuaTypeAt
             // "global" => {
             //     attr |= LuaTypeAttribute::Global;
             // }
+            "env" => {
+                attr |= LuaTypeAttribute::Env;
+            }
             "exact" => {
                 attr |= LuaTypeAttribute::Exact;
             }

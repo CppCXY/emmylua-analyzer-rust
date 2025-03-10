@@ -46,6 +46,8 @@ pub enum DiagnosticCode {
     IterVariableReassign,
     /// Duplicate type
     DuplicateType,
+    /// Multi env
+    MultiEnv,
     /// Redefined local
     RedefinedLocal,
     /// Redefined label

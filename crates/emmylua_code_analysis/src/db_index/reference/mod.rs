@@ -54,6 +54,11 @@ impl LuaReferenceIndex {
             .insert(syntax_id);
     }
 
+    pub fn remove_global_reference(&mut self, name: &str, file_id: FileId) {
+        let key = SmolStr::new(name);
+        self.global_references.get_mut(&key).and_then(|x| x.remove(&file_id));
+    }
+
     pub fn add_index_reference(
         &mut self,
         key: LuaMemberKey,
