@@ -138,8 +138,10 @@ fn infer_index_expr_property_owner(
     owner_guard: OwnerGuard,
 ) -> Option<LuaPropertyOwnerId> {
     let prefix_expr = index_expr.get_prefix_expr()?;
-    let prefix_type = infer_expr(db, cache, prefix_expr.into())?;
-
+    let mut prefix_type = infer_expr(db, cache, prefix_expr.into())?;
+    if let LuaType::DocStringConst(_) = &prefix_type {
+        prefix_type = LuaType::String;
+    }
     let member_key = index_expr.get_index_key()?.into();
     if let Some(member_info) = infer_member_property_owner_by_member_key(
         db,

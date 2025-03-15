@@ -2,6 +2,49 @@
 mod tests {
     use crate::{DiagnosticCode, VirtualWorkspace};
 
+    #[test]
+    fn test_issue_193() {
+        let mut ws = VirtualWorkspace::new();
+        assert!(ws.check_code_for_namespace(
+            DiagnosticCode::AssignTypeMismatch,
+            r#"
+                --- @return string?
+                --- @return string?
+                local function foo() end
+
+                local a, b = foo()
+            "#
+        ));
+    }
+
+    #[test]
+    fn test_issue_196() {
+        let mut ws = VirtualWorkspace::new();
+        assert!(ws.check_code_for_namespace(
+            DiagnosticCode::AssignTypeMismatch,
+            r#"
+                ---@class A
+
+                ---@return table
+                function foo() end
+
+                ---@type A
+                local _ = foo()
+            "#
+        ));
+    }
+
+    #[test]
+    fn test_issue_197() {
+        let mut ws = VirtualWorkspace::new_with_init_std_lib();
+        assert!(ws.check_code_for_namespace(
+            DiagnosticCode::AssignTypeMismatch,
+            r#"
+                local a = setmetatable({}, {})
+            "#
+        ));
+    }
+
     /// 暂时无法解决的测试
     #[test]
     fn test_error() {

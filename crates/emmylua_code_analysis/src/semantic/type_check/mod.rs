@@ -108,7 +108,12 @@ fn check_general_type_compact(
         // invalid source type
         // LuaType::MuliReturn(_) |
         // LuaType::MemberPathExist(_) |
-        // LuaType::Instance(_) |
+        LuaType::Instance(instantiate) => check_general_type_compact(
+            db,
+            instantiate.get_base(),
+            compact_type,
+            check_guard.next_level()?,
+        ),
         _ => Err(TypeCheckFailReason::TypeNotMatch),
     }
 }

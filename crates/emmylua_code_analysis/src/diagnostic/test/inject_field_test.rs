@@ -3,6 +3,18 @@ mod test {
     use crate::{DiagnosticCode, VirtualWorkspace};
 
     #[test]
+    fn test_issue_195() {
+        let mut ws = VirtualWorkspace::new();
+        assert!(ws.check_code_for(
+            DiagnosticCode::InjectField,
+            r#"
+        local ret = {} --- @type string[]
+        ret[#ret + 1] = 'a'
+        "#
+        ));
+    }
+
+    #[test]
     fn test_inject_field() {
         let mut ws = VirtualWorkspace::new();
         assert!(!ws.check_code_for(

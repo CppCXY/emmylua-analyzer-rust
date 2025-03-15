@@ -1,12 +1,12 @@
 use emmylua_parser::{
-    LuaAssignStat, LuaAst, LuaAstNode, LuaAstToken, LuaExpr, LuaIndexExpr, LuaLocalStat,
-    LuaNameExpr, LuaTableExpr, LuaVarExpr,
+    LuaAssignStat, LuaAst, LuaAstNode, LuaAstToken, LuaExpr, LuaIndexExpr, LuaLocalName,
+    LuaLocalStat, LuaNameExpr, LuaTableExpr, LuaVarExpr,
 };
 use rowan::TextRange;
 
 use crate::{
-    DiagnosticCode, LuaDeclId, LuaPropertyOwnerId, LuaType, SemanticModel, TypeCheckFailReason,
-    TypeCheckResult,
+    DiagnosticCode, LuaDeclId, LuaMultiReturn, LuaPropertyOwnerId, LuaType, SemanticModel,
+    TypeCheckFailReason, TypeCheckResult,
 };
 
 use super::{humanize_lint_type, DiagnosticContext};
@@ -103,33 +103,88 @@ fn check_local_stat(
     semantic_model: &SemanticModel,
     local: &LuaLocalStat,
 ) -> Option<()> {
-    let root = semantic_model.get_root().syntax();
+    fn process_single_assignment(
+        context: &mut DiagnosticContext,
+        semantic_model: &SemanticModel,
+        name_list: &[LuaLocalName],
+        value_expr: &LuaExpr,
+        typ: &LuaType,
+        current_idx: usize,
+    ) -> Option<()> {
+        if current_idx >= name_list.len() {
+            return Some(());
+        }
 
-    for name in local.get_local_name_list() {
-        let name_token = name.get_name_token()?;
-        let position = name_token.get_position();
-        let file_id = semantic_model.get_file_id();
-        let decl_id = LuaDeclId::new(file_id, position);
+        let name_token = name_list[current_idx].get_name_token()?;
+        let decl_id = LuaDeclId::new(semantic_model.get_file_id(), name_token.get_position());
         let decl = semantic_model
             .get_db()
             .get_decl_index()
             .get_decl(&decl_id)?;
-        let value_expr = LuaExpr::cast(decl.get_value_syntax_id()?.to_node_from_root(root)?)?;
-        handle_value_is_table_expr(
-            context,
-            semantic_model,
-            decl.get_type().cloned(),
-            &value_expr,
-        );
+        let name_type = decl.get_type()?;
+
         check_assign_type_mismatch(
             context,
             semantic_model,
             decl.get_range(),
-            decl.get_type().cloned(),
-            semantic_model.infer_expr(value_expr),
+            Some(name_type.clone()),
+            Some(typ.clone()),
             false,
         );
+
+        handle_value_is_table_expr(context, semantic_model, Some(name_type.clone()), value_expr);
+
+        Some(())
     }
+
+    let name_list = local.get_local_name_list().collect::<Vec<_>>();
+    let value_exprs = local.get_value_exprs();
+
+    let mut current_index = 0;
+    for value_expr in value_exprs {
+        let expr_type = semantic_model.infer_expr(value_expr.clone())?;
+
+        match expr_type {
+            LuaType::MuliReturn(multi) => match &*multi {
+                LuaMultiReturn::Multi(types) => {
+                    for typ in types {
+                        process_single_assignment(
+                            context,
+                            semantic_model,
+                            &name_list,
+                            &value_expr,
+                            typ,
+                            current_index,
+                        )?;
+                        current_index += 1;
+                    }
+                }
+                LuaMultiReturn::Base(typ) => {
+                    process_single_assignment(
+                        context,
+                        semantic_model,
+                        &name_list,
+                        &value_expr,
+                        typ,
+                        current_index,
+                    )?;
+                    current_index += 1;
+                }
+            },
+            _ => {
+                process_single_assignment(
+                    context,
+                    semantic_model,
+                    &name_list,
+                    &value_expr,
+                    &expr_type,
+                    current_index,
+                )?;
+                current_index += 1;
+            }
+        }
+    }
+
     Some(())
 }
 
@@ -141,36 +196,37 @@ fn handle_value_is_table_expr(
     value_expr: &LuaExpr,
 ) -> Option<()> {
     let table_type = table_type?;
-    let table_expr = LuaTableExpr::cast(value_expr.syntax().clone())?;
     let member_infos = semantic_model.infer_member_infos(&table_type)?;
-    table_expr.get_fields().for_each(|field| {
-        let field_key = field.get_field_key();
-        if let Some(field_key) = field_key {
-            let field_path_part = field_key.get_path_part();
-            let source_type = member_infos
-                .iter()
-                .find(|info| info.key.to_path() == field_path_part)
-                .map(|info| info.typ.clone());
-            let expr = field.get_value_expr();
-            if let Some(expr) = expr {
-                let expr_type = semantic_model.infer_expr(expr);
+    LuaTableExpr::cast(value_expr.syntax().clone())?
+        .get_fields()
+        .for_each(|field| {
+            let field_key = field.get_field_key();
+            if let Some(field_key) = field_key {
+                let field_path_part = field_key.get_path_part();
+                let source_type = member_infos
+                    .iter()
+                    .find(|info| info.key.to_path() == field_path_part)
+                    .map(|info| info.typ.clone());
+                let expr = field.get_value_expr();
+                if let Some(expr) = expr {
+                    let expr_type = semantic_model.infer_expr(expr);
 
-                let allow_nil = match table_type {
-                    LuaType::Array(_) => true,
-                    _ => false,
-                };
+                    let allow_nil = match table_type {
+                        LuaType::Array(_) => true,
+                        _ => false,
+                    };
 
-                check_assign_type_mismatch(
-                    context,
-                    semantic_model,
-                    field.get_range(),
-                    source_type,
-                    expr_type,
-                    allow_nil,
-                );
+                    check_assign_type_mismatch(
+                        context,
+                        semantic_model,
+                        field.get_range(),
+                        source_type,
+                        expr_type,
+                        allow_nil,
+                    );
+                }
             }
-        }
-    });
+        });
     Some(())
 }
 
@@ -198,6 +254,12 @@ fn check_assign_type_mismatch(
         (LuaType::Ref(_) | LuaType::Tuple(_), LuaType::TableConst(_)) => return Some(()),
         // 如果源类型是nil, 则不进行类型检查
         (LuaType::Nil, _) => return Some(()),
+        // // fix issue #196
+        (LuaType::Ref(_), LuaType::Instance(instance)) => {
+            if instance.get_base().is_table() {
+                return Some(());
+            }
+        }
         _ => {}
     }
 

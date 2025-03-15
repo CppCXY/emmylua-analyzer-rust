@@ -29,8 +29,11 @@ pub fn infer_index_expr(
     index_expr: LuaIndexExpr,
 ) -> InferResult {
     let prefix_expr = index_expr.get_prefix_expr()?;
-    let prefix_type = infer_expr(db, cache, prefix_expr)?;
+    let mut prefix_type = infer_expr(db, cache, prefix_expr)?;
     let index_member_expr = LuaIndexMemberExpr::IndexExpr(index_expr.clone());
+    if let LuaType::DocStringConst(_) = &prefix_type {
+        prefix_type = LuaType::String;
+    }
 
     let mut member_type = if let Some(member_type) = infer_member_by_member_key(
         db,
