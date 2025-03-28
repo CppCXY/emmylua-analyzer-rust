@@ -129,7 +129,7 @@ fn check_params(
         };
 
         let name = name_token.get_name_text();
-        if !doc_param_names.contains(name) {
+        if !doc_param_names.contains(name) && name != "_" {
             let message = if is_global {
                 t!(
                     "Missing @param annotation for parameter `%{name}` in global function `%{function_name}`.",

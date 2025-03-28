@@ -4,6 +4,22 @@ mod tests {
     use crate::{DiagnosticCode, VirtualWorkspace};
 
     #[test]
+    fn test_290() {
+        let mut ws = VirtualWorkspace::new();
+        ws.enable_full_diagnostic();
+
+        assert!(ws.check_code_for(
+            DiagnosticCode::IncompleteSignatureDoc,
+            r#"
+                ---@param a string
+                local function foo(_, a)
+                    _ = a
+                end
+            "#
+        ));
+    }
+
+    #[test]
     fn test_return() {
         let mut ws = VirtualWorkspace::new();
         ws.enable_full_diagnostic();
