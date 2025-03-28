@@ -68,11 +68,26 @@ fn infer_member_type_pass_flow(
     prefix_type: &LuaType,
     mut member_type: LuaType,
 ) -> InferResult {
-    // temp fix flow
-    // TODO: flow analysis should not generate corresponding `flow_chain` if the prefix type is an array
+    let mut allow_reassign = true;
     match &prefix_type {
+        // TODO: flow analysis should not generate corresponding `flow_chain` if the prefix type is an array
         LuaType::Array(_) => {
             return Ok(member_type.clone());
+        }
+        LuaType::Ref(decl_id) => {
+            if let Some(members) = db
+                .get_member_index()
+                .get_members(&LuaMemberOwner::Type(decl_id.clone()))
+            {
+                if let Some(key) = index_expr.get_index_key() {
+                    if let Some(_) = members
+                        .iter()
+                        .find(|m| m.get_key().to_path() == key.get_path_part())
+                    {
+                        allow_reassign = false
+                    }
+                }
+            }
         }
         _ => {}
     }
@@ -85,6 +100,9 @@ fn infer_member_type_pass_flow(
         let root = index_expr.get_root();
         if let Some(path) = index_expr.get_access_path() {
             for type_assert in flow_chain.get_type_asserts(&path, index_expr.get_position(), None) {
+                if type_assert.is_reassign() && !allow_reassign {
+                    continue;
+                }
                 member_type = type_assert
                     .tighten_type(db, cache, &root, member_type)
                     .unwrap_or(LuaType::Unknown);
