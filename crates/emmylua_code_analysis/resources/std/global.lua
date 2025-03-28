@@ -393,7 +393,7 @@ function setmetatable(table, metatable) end
 ---@param e any
 ---@return number?
 ---@nodiscard
-function tonumber(e, base) end
+function tonumber(e) end
 
 ---
 --- Receives a value of any type and converts it to a string in a human-readable
