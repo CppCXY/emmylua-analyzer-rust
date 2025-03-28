@@ -166,7 +166,11 @@ fn infer_binary_expr_add(db: &DbIndex, left: LuaType, right: LuaType) -> InferRe
             }
         };
     }
-    match (left.is_nil(), right.is_nil()) {
+
+    match (
+        left.is_nil() || left.is_any() || left.is_unknown(),
+        right.is_nil() || right.is_any() || right.is_unknown(),
+    ) {
         (true, false) => return Ok(right),
         (false, true) => return Ok(left),
         _ => {}
