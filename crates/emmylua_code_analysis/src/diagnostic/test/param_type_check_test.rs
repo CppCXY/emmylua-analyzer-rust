@@ -445,4 +445,25 @@ mod test {
         "#
         ))
     }
+
+    #[test]
+    fn test_4() {
+        let mut ws = VirtualWorkspace::new();
+
+        assert!(ws.check_code_for(
+            DiagnosticCode::ParamTypeNotMatch,
+            r#" 
+            ---@class D13.Meta
+            ---@field __defineGet fun(self: self, key: string, f: fun(self: self): any)
+
+            ---@class D13.Impl: D13.Meta
+            local impl = {}
+
+            impl:__defineGet("value", function(self)
+                return 1
+            end)
+
+            "#
+        ));
+    }
 }
