@@ -1,3 +1,5 @@
+use std::collections::HashSet;
+
 use crate::{
     DbIndex, GenericTpl, LuaAliasCallType, LuaFunctionType, LuaGenericType, LuaInstanceType,
     LuaIntersectionType, LuaMemberKey, LuaMemberOwner, LuaMultiReturn, LuaObjectType,
@@ -170,15 +172,30 @@ fn humanize_union_type(db: &DbIndex, union: &LuaUnionType, level: RenderLevel) -
             return "union<...>".to_string();
         }
     };
-    let dots = if types.len() > num { "..." } else { "" };
+    // 需要确保顺序
+    let mut seen = HashSet::new();
+    let mut type_strings = Vec::new();
+    for ty in types.iter() {
+        let type_str = humanize_type(db, ty, level.next_level());
+        if seen.insert(type_str.clone()) {
+            type_strings.push(type_str);
+        }
+    }
 
-    let type_str = types
-        .iter()
-        .take(num)
-        .map(|ty| humanize_type(db, ty, level.next_level()))
-        .collect::<Vec<_>>()
-        .join("|");
-    format!("({}{})", type_str, dots)
+    // 取指定数量的类型
+    let display_types: Vec<_> = type_strings.into_iter().take(num).collect();
+    let type_str = display_types.join("|");
+    let dots = if display_types.len() < types.len() {
+        "..."
+    } else {
+        ""
+    };
+
+    if display_types.len() == 1 {
+        type_str
+    } else {
+        format!("({}{})", type_str, dots)
+    }
 }
 
 fn humanize_multi_line_union_type(
