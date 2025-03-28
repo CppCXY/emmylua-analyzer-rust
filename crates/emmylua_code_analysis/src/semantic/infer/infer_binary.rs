@@ -16,12 +16,12 @@ pub fn infer_binary_expr(
 ) -> InferResult {
     let op = expr.get_op_token().ok_or(InferFailReason::None)?.get_op();
     let (left, right) = expr.get_exprs().ok_or(InferFailReason::None)?;
-    let left_type = infer_expr(db, cache, left)?;
-    let right_type = infer_expr(db, cache, right)?;
+    let left_type = infer_expr(db, cache, left.clone())?;
+    let right_type = infer_expr(db, cache, right.clone())?;
 
     match (&left_type, &right_type) {
-        (LuaType::Union(u), right) => infer_union(db, &u, right, op),
-        (left, LuaType::Union(u)) => infer_union(db, &u, left, op),
+        (LuaType::Union(u), right) => infer_union(db, &u, right, op, true),
+        (left, LuaType::Union(u)) => infer_union(db, &u, left, op, false),
         _ => infer_binary_expr_type(db, left_type, right_type, op),
     }
 }
@@ -58,11 +58,21 @@ fn infer_binary_expr_type(
     }
 }
 
-fn infer_union(db: &DbIndex, u: &LuaUnionType, right: &LuaType, op: BinaryOperator) -> InferResult {
+fn infer_union(
+    db: &DbIndex,
+    u: &LuaUnionType,
+    right: &LuaType,
+    op: BinaryOperator,
+    union_is_left: bool,
+) -> InferResult {
     let mut unique_union_types = Vec::new();
 
     for ty in u.get_types() {
-        let inferred_ty = infer_binary_expr_type(db, ty.clone(), right.clone(), op)?;
+        let inferred_ty = if union_is_left {
+            infer_binary_expr_type(db, ty.clone(), right.clone(), op)?
+        } else {
+            infer_binary_expr_type(db, right.clone(), ty.clone(), op)?
+        };
         flatten_and_insert(inferred_ty, &mut unique_union_types);
     }
 

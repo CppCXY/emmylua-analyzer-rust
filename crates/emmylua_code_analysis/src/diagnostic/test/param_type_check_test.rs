@@ -466,4 +466,30 @@ mod test {
             "#
         ));
     }
+
+    #[test]
+    fn test_issue_286() {
+        let mut ws = VirtualWorkspace::new();
+        assert!(ws.check_code_for(
+            DiagnosticCode::ParamTypeNotMatch,
+            r#"
+                local a --- @type boolean
+                local b --- @type integer?
+                local c = a and b or nil
+                -- type of c is (nil|true), should be (integer|nil)
+                local d = a and b
+                -- type of d is (boolean|nil), should be (false|integer|nil) 
+
+                ---@param p integer?
+                local function f1(p)
+                end
+                f1(c)
+
+                ---@param p false|integer|nil
+                local function f2(p)
+                end
+                f2(d)
+        "#
+        ));
+    }
 }
