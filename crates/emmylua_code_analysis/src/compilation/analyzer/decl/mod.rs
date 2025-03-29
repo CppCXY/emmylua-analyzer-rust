@@ -7,7 +7,7 @@ use crate::{
     profile::Profile,
 };
 
-use super::AnalyzeContext;
+use super::{unresolve::UnResolve, AnalyzeContext};
 use emmylua_parser::{LuaAst, LuaAstNode, LuaChunk, LuaFuncStat, LuaSyntaxKind, LuaVarExpr};
 use rowan::{TextRange, TextSize, WalkEvent};
 
@@ -18,14 +18,18 @@ use crate::{
 
 pub(crate) fn analyze(db: &mut DbIndex, context: &mut AnalyzeContext) {
     let _p = Profile::cond_new("decl analyze", context.tree_list.len() > 1);
-    for in_filed_tree in context.tree_list.iter() {
+    let tree_list = context.tree_list.clone();
+    for in_filed_tree in tree_list.iter() {
         db.get_reference_index_mut()
             .create_local_reference(in_filed_tree.file_id);
         let mut analyzer =
             DeclAnalyzer::new(db, in_filed_tree.file_id, in_filed_tree.value.clone());
         analyzer.analyze();
-        let decl_tree = analyzer.get_decl_tree();
+        let (decl_tree, unresolved) = analyzer.get_decl_tree();
         db.get_decl_index_mut().add_decl_tree(decl_tree);
+        for unresolve in unresolved {
+            context.add_unresolve(unresolve);
+        }
     }
 }
 
@@ -138,6 +142,7 @@ pub struct DeclAnalyzer<'a> {
     decl: LuaDeclarationTree,
     scopes: Vec<LuaScopeId>,
     is_meta: bool,
+    pub unresolved: Vec<UnResolve>,
 }
 
 impl<'a> DeclAnalyzer<'a> {
@@ -148,6 +153,7 @@ impl<'a> DeclAnalyzer<'a> {
             decl: LuaDeclarationTree::new(file_id),
             scopes: Vec::new(),
             is_meta: false,
+            unresolved: Vec::new(),
         }
     }
 
@@ -161,8 +167,16 @@ impl<'a> DeclAnalyzer<'a> {
         }
     }
 
-    pub fn get_decl_tree(self) -> LuaDeclarationTree {
-        self.decl
+    pub fn get_file_id(&self) -> FileId {
+        self.decl.file_id()
+    }
+
+    pub fn add_unresolved(&mut self, unresolved: UnResolve) {
+        self.unresolved.push(unresolved);
+    }
+
+    pub fn get_decl_tree(self) -> (LuaDeclarationTree, Vec<UnResolve>) {
+        (self.decl, self.unresolved)
     }
 
     pub fn create_scope(&mut self, range: TextRange, kind: LuaScopeKind) {
@@ -205,10 +219,6 @@ impl<'a> DeclAnalyzer<'a> {
 
     pub fn find_decl(&self, name: &str, position: TextSize) -> Option<&LuaDecl> {
         self.decl.find_local_decl(name, position)
-    }
-
-    pub fn get_file_id(&self) -> FileId {
-        self.decl.file_id()
     }
 }
 

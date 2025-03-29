@@ -1,13 +1,17 @@
+use emmylua_parser::{LuaAstNode, LuaExpr, LuaLocalStat};
+
 use crate::{
     compilation::analyzer::lua::analyze_return_point,
     db_index::{DbIndex, LuaMemberOwner, LuaType},
     semantic::{infer_expr, LuaInferCache},
-    LuaSemanticDeclId, SignatureReturnStatus,
+    InFiled, InferFailReason, LuaDeclId, LuaMember, LuaMemberId, LuaMemberKey, LuaSemanticDeclId,
+    SignatureReturnStatus,
 };
 
 use super::{
     check_reason::check_reach_reason, merge_decl_expr_type, merge_member_type, UnResolveDecl,
     UnResolveIterVar, UnResolveMember, UnResolveModule, UnResolveModuleRef, UnResolveReturn,
+    UnResolveTableField,
 };
 
 pub fn try_resolve_decl(
@@ -103,6 +107,85 @@ pub fn try_resolve_member(
 
         let member_id = unresolve_member.member_id;
         merge_member_type(db, cache, member_id, expr_type);
+    }
+    Some(true)
+}
+
+pub fn try_resolve_table_field(
+    db: &mut DbIndex,
+    cache: &mut LuaInferCache,
+    unresolve_table_field: &mut UnResolveTableField,
+) -> Option<bool> {
+    if !check_reach_reason(db, cache, &unresolve_table_field.reason).unwrap_or(false) {
+        return None;
+    }
+    if !matches!(
+        unresolve_table_field.reason,
+        InferFailReason::UnResolveExpr(_)
+    ) {
+        return None;
+    }
+    let field = unresolve_table_field.field.clone();
+    let field_key = field.get_field_key()?;
+    let field_expr = field_key.get_expr()?;
+    let field_type = match infer_expr(db, cache, field_expr.clone()) {
+        Ok(t) => t,
+        Err(reason) => {
+            unresolve_table_field.reason = reason;
+            return None;
+        }
+    };
+    let member_key: LuaMemberKey = match field_type {
+        LuaType::StringConst(s) => LuaMemberKey::Name((*s).clone()),
+        LuaType::IntegerConst(i) => LuaMemberKey::Integer(i),
+        _ => {
+            if field_type.is_table() {
+                LuaMemberKey::SyntaxId(field_expr.get_syntax_id())
+            } else {
+                return None;
+            }
+        }
+    };
+    let file_id = unresolve_table_field.file_id;
+    let table_expr = unresolve_table_field.table_expr.clone();
+    let owner_id = LuaMemberOwner::Element(InFiled {
+        file_id,
+        value: table_expr.get_range(),
+    });
+
+    db.get_reference_index_mut().add_index_reference(
+        member_key.clone(),
+        file_id,
+        field.get_syntax_id(),
+    );
+
+    let decl_type = field.get_value_expr().map_or(None, |expr| {
+        let expr_type = infer_expr(db, cache, expr).ok()?;
+        Some(expr_type)
+    });
+
+    let member_id = LuaMemberId::new(field.get_syntax_id(), file_id);
+    let member = LuaMember::new(
+        owner_id.clone(),
+        member_id,
+        member_key,
+        unresolve_table_field.decl_feature,
+        decl_type,
+    );
+    db.get_member_index_mut().add_member(member);
+
+    // 如果是`Def`则更新
+    let local_name = table_expr
+        .get_parent::<LuaLocalStat>()?
+        .get_value_local_name(LuaExpr::TableExpr(table_expr.clone()))?;
+    let decl_id = LuaDeclId::new(file_id, local_name.get_position());
+    let decl_type = db.get_decl_index_mut().get_decl_mut(&decl_id)?.get_type()?;
+    if let LuaType::Def(id) = decl_type {
+        let owner = LuaMemberOwner::Type(id.clone());
+        db.get_member_index_mut()
+            .set_member_owner(owner.clone(), member_id.file_id, member_id);
+        db.get_member_index_mut()
+            .add_member_to_owner(owner.clone(), member_id);
     }
     Some(true)
 }

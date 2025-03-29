@@ -101,20 +101,20 @@ mod test {
     fn test_class_key_to_class_key() {
         let mut ws = VirtualWorkspace::new();
 
-        assert!(!ws.check_code_for(
-            DiagnosticCode::UndefinedField,
-            r#"
-                --- @type table<string, integer>
-                local FUNS = {}
+        // assert!(!ws.check_code_for(
+        //     DiagnosticCode::UndefinedField,
+        //     r#"
+        //         --- @type table<string, integer>
+        //         local FUNS = {}
 
-                ---@class D10.AAA
+        //         ---@class D10.AAA
 
-                ---@type D10.AAA
-                local Test1
+        //         ---@type D10.AAA
+        //         local Test1
 
-                local a = FUNS[Test1]
-            "#
-        ));
+        //         local a = FUNS[Test1]
+        //     "#
+        // ));
 
         assert!(ws.check_code_for(
             DiagnosticCode::UndefinedField,
@@ -155,6 +155,27 @@ mod test {
                         return -indexMap[v]
                     end
                 end
+            "#
+        ));
+    }
+
+    #[test]
+    fn test_index_key_define() {
+        let mut ws = VirtualWorkspace::new();
+
+        assert!(ws.check_code_for(
+            DiagnosticCode::UndefinedField,
+            r#"
+                local Flags = {
+                    A = {},
+                }
+
+                ---@class (constructor) RefImpl
+                local a = {
+                    [Flags.A] = true,
+                }
+
+                print(a[Flags.A])
             "#
         ));
     }

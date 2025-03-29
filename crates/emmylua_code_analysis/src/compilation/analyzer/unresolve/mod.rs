@@ -7,15 +7,17 @@ mod resolve_closure;
 use crate::{
     db_index::{DbIndex, LuaDeclId, LuaMemberId, LuaSignatureId},
     profile::Profile,
-    FileId, InferFailReason, LuaSemanticDeclId,
+    FileId, InferFailReason, LuaMemberFeature, LuaSemanticDeclId,
 };
 use check_reason::{resolve_all_reason, resolve_as_any};
-use emmylua_parser::{LuaAssignStat, LuaCallExpr, LuaExpr, LuaFuncStat, LuaTableField};
+use emmylua_parser::{
+    LuaAssignStat, LuaCallExpr, LuaExpr, LuaFuncStat, LuaTableExpr, LuaTableField,
+};
 use infer_manager::InferCacheManager;
 pub use merge_type::{merge_decl_expr_type, merge_member_type};
 use resolve::{
     try_resolve_decl, try_resolve_iter_var, try_resolve_member, try_resolve_module,
-    try_resolve_module_ref, try_resolve_return_point,
+    try_resolve_module_ref, try_resolve_return_point, try_resolve_table_field,
 };
 use resolve_closure::{
     try_resolve_closure_params, try_resolve_closure_parent_params, try_resolve_closure_return,
@@ -92,6 +94,9 @@ fn try_resolve(
                 try_resolve_closure_parent_params(db, config, un_resolve_closure_params)
                     .unwrap_or(false)
             }
+            UnResolve::TableField(un_resolve_table_field) => {
+                try_resolve_table_field(db, config, un_resolve_table_field).unwrap_or(false)
+            }
             UnResolve::None => continue,
         };
 
@@ -116,6 +121,7 @@ pub enum UnResolve {
     ClosureReturn(Box<UnResolveClosureReturn>),
     ClosureParentParams(Box<UnResolveParentClosureParams>),
     ModuleRef(Box<UnResolveModuleRef>),
+    TableField(Box<UnResolveTableField>),
 }
 
 #[allow(dead_code)]
@@ -140,6 +146,7 @@ impl UnResolve {
             UnResolve::ClosureParentParams(un_resolve_closure_params) => {
                 Some(un_resolve_closure_params.file_id)
             }
+            UnResolve::TableField(un_resolve_table_field) => Some(un_resolve_table_field.file_id),
             UnResolve::ModuleRef(_) => None,
             UnResolve::None => None,
         }
@@ -277,5 +284,20 @@ pub struct UnResolveParentClosureParams {
 impl From<UnResolveParentClosureParams> for UnResolve {
     fn from(un_resolve_closure_params: UnResolveParentClosureParams) -> Self {
         UnResolve::ClosureParentParams(Box::new(un_resolve_closure_params))
+    }
+}
+
+#[derive(Debug)]
+pub struct UnResolveTableField {
+    pub file_id: FileId,
+    pub table_expr: LuaTableExpr,
+    pub field: LuaTableField,
+    pub decl_feature: LuaMemberFeature,
+    pub reason: InferFailReason,
+}
+
+impl From<UnResolveTableField> for UnResolve {
+    fn from(un_resolve_table_field: UnResolveTableField) -> Self {
+        UnResolve::TableField(Box::new(un_resolve_table_field))
     }
 }

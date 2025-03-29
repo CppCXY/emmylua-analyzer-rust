@@ -4,8 +4,10 @@ use emmylua_parser::{
 };
 
 use crate::{
+    compilation::analyzer::unresolve::UnResolveTableField,
     db_index::{LuaDecl, LuaMember, LuaMemberKey, LuaMemberOwner},
-    FileId, InFiled, LuaDeclExtra, LuaDeclId, LuaMemberFeature, LuaMemberId, LuaSignatureId,
+    FileId, InFiled, InferFailReason, LuaDeclExtra, LuaDeclId, LuaMemberFeature, LuaMemberId,
+    LuaSignatureId,
 };
 
 use super::DeclAnalyzer;
@@ -180,18 +182,33 @@ fn analyze_closure_params(
     Some(())
 }
 
-pub fn analyze_table_expr(analyzer: &mut DeclAnalyzer, expr: LuaTableExpr) -> Option<()> {
-    if expr.is_object() {
+pub fn analyze_table_expr(analyzer: &mut DeclAnalyzer, table_expr: LuaTableExpr) -> Option<()> {
+    if table_expr.is_object() {
         let file_id = analyzer.get_file_id();
         let owner_id = LuaMemberOwner::Element(InFiled {
             file_id,
-            value: expr.get_range(),
+            value: table_expr.get_range(),
         });
+        let decl_feature = if analyzer.is_meta {
+            LuaMemberFeature::MetaDefine
+        } else {
+            LuaMemberFeature::FileDefine
+        };
 
-        for field in expr.get_fields() {
+        for field in table_expr.get_fields() {
             if let Some(field_key) = field.get_field_key() {
-                let key: LuaMemberKey = field_key.into();
+                let key: LuaMemberKey = field_key.clone().into();
                 if key.is_none() {
+                    if let Some(field_expr) = field_key.get_expr() {
+                        let unresolve_member = UnResolveTableField {
+                            file_id: analyzer.get_file_id(),
+                            table_expr: table_expr.clone(),
+                            field: field.clone(),
+                            decl_feature,
+                            reason: InferFailReason::UnResolveExpr(field_expr.clone()),
+                        };
+                        analyzer.add_unresolved(unresolve_member.into());
+                    }
                     continue;
                 }
 
@@ -200,12 +217,6 @@ pub fn analyze_table_expr(analyzer: &mut DeclAnalyzer, expr: LuaTableExpr) -> Op
                     file_id,
                     field.get_syntax_id(),
                 );
-
-                let decl_feature = if analyzer.is_meta {
-                    LuaMemberFeature::MetaDefine
-                } else {
-                    LuaMemberFeature::FileDefine
-                };
 
                 let member_id = LuaMemberId::new(field.get_syntax_id(), file_id);
                 let member = LuaMember::new(owner_id.clone(), member_id, key, decl_feature, None);

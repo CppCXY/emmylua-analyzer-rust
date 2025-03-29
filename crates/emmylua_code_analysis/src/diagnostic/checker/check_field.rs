@@ -1,8 +1,8 @@
 use std::collections::HashSet;
 
-use emmylua_parser::{LuaAst, LuaAstNode, LuaIndexExpr, LuaIndexKey, LuaVarExpr};
+use emmylua_parser::{LuaAst, LuaAstNode, LuaExpr, LuaIndexExpr, LuaIndexKey, LuaVarExpr};
 
-use crate::{DiagnosticCode, InferFailReason, LuaType, SemanticModel};
+use crate::{DiagnosticCode, InferFailReason, LuaMemberKey, LuaType, SemanticModel};
 
 use super::{humanize_lint_type, Checker, DiagnosticContext};
 
@@ -169,41 +169,59 @@ fn is_valid_member(
         (LuaType::Tuple(_), LuaType::Integer | LuaType::IntegerConst(_)) => return Some(()),
         _ => {}
     }
-
     // 解决`key`类型为联合名称时的报错(通常是`pairs`返回的`key`)
-    let mut key_path_set = HashSet::new();
-    get_index_key_names(&mut key_path_set, &key_type);
-    if key_path_set.is_empty() {
+    let (key_name_set, key_type_set) = get_key_types(&key_type);
+    if key_name_set.is_empty() && key_type_set.is_empty() {
         return None;
     }
-    let member_path_set: HashSet<_> = semantic_model
-        .infer_member_infos(prefix_typ)?
-        .iter()
-        .map(|info| info.key.to_path())
-        .collect();
-
-    if member_path_set.is_empty() {
-        return None;
-    }
-    if key_path_set.is_subset(&member_path_set) {
-        return Some(());
+    let members = semantic_model.infer_member_infos(prefix_typ)?;
+    for info in members {
+        match &info.key {
+            LuaMemberKey::SyntaxId(syntax_id) => {
+                let node = syntax_id.to_node_from_root(semantic_model.get_root().syntax())?;
+                let expr = LuaExpr::cast(node)?;
+                if let Ok(typ) = semantic_model.infer_expr(expr) {
+                    if key_type_set.contains(&typ) {
+                        return Some(());
+                    }
+                }
+            }
+            _ => {
+                let key_name = info.key.to_path();
+                if key_name_set.contains(&key_name) {
+                    return Some(());
+                }
+            }
+        }
     }
 
     None
 }
 
-fn get_index_key_names(name_set: &mut HashSet<String>, typ: &LuaType) {
-    match typ {
-        LuaType::StringConst(name) => {
-            name_set.insert(name.as_ref().to_string());
+fn get_key_types(typ: &LuaType) -> (HashSet<String>, HashSet<LuaType>) {
+    let mut type_set = HashSet::new();
+    let mut name_set = HashSet::new();
+    let mut stack = vec![typ.clone()];
+
+    while let Some(current_type) = stack.pop() {
+        match &current_type {
+            LuaType::StringConst(name) => {
+                name_set.insert(name.as_ref().to_string());
+            }
+            LuaType::IntegerConst(i) => {
+                name_set.insert(format!("[{}]", i));
+            }
+            LuaType::Union(union_typ) => {
+                for t in union_typ.get_types() {
+                    stack.push(t.clone());
+                }
+            }
+            _ => {
+                if current_type.is_table() {
+                    type_set.insert(current_type);
+                }
+            }
         }
-        LuaType::IntegerConst(i) => {
-            name_set.insert(format!("[{}]", i));
-        }
-        LuaType::Union(union_typ) => union_typ
-            .get_types()
-            .iter()
-            .for_each(|typ| get_index_key_names(name_set, typ)),
-        _ => {}
     }
+    (name_set, type_set)
 }

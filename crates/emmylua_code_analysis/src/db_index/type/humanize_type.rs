@@ -354,6 +354,7 @@ fn humanize_object_type(db: &DbIndex, object: &LuaObjectType, level: RenderLevel
                 LuaMemberKey::Integer(i) => format!("[{}]: {}", i, ty_str),
                 LuaMemberKey::Name(s) => format!("{}: {}", s, ty_str),
                 LuaMemberKey::None => ty_str,
+                LuaMemberKey::SyntaxId(_) => ty_str,
             }
         })
         .collect::<Vec<_>>()
@@ -669,5 +670,6 @@ fn build_table_member_string(
         LuaMemberKey::Name(name) => format!("{name}{separator}{member_value}"),
         LuaMemberKey::Integer(i) => format!("[{i}]{separator}{member_value}"),
         LuaMemberKey::None => member_value,
+        LuaMemberKey::SyntaxId(_) => member_value,
     }
 }
