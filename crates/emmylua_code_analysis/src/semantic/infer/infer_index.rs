@@ -447,25 +447,23 @@ fn infer_member_by_index_custom_type(
     }
 
     let index_key = index_expr.get_index_key().ok_or(InferFailReason::None)?;
-    if let Some(operators_map) = db
+    if let Some(index_operator_ids) = db
         .get_operator_index()
-        .get_operators_by_type(prefix_type_id)
+        .get_operators(&prefix_type_id.clone().into(), LuaOperatorMetaMethod::Index)
     {
-        if let Some(index_operator_ids) = operators_map.get(&LuaOperatorMetaMethod::Index) {
-            for operator_id in index_operator_ids {
-                let operator = db
-                    .get_operator_index()
-                    .get_operator(operator_id)
-                    .ok_or(InferFailReason::None)?;
-                let operands = operator.get_operands();
-                let return_type = operator.get_result();
-                if operands.len() == 1 {
-                    let typ =
-                        infer_index_metamethod(db, cache, &index_key, &operands[0], &return_type)?;
-                    return Ok(typ);
-                }
+        for operator_id in index_operator_ids {
+            let operator = db
+                .get_operator_index()
+                .get_operator(operator_id)
+                .ok_or(InferFailReason::None)?;
+            let operands = operator.get_operands();
+            let return_type = operator.get_result();
+            if operands.len() == 1 {
+                let typ =
+                    infer_index_metamethod(db, cache, &index_key, &operands[0], &return_type)?;
+                return Ok(typ);
             }
-        };
+        }
     }
 
     // find member by key in super
@@ -629,10 +627,9 @@ fn infer_member_by_index_generic(
 
     let member_key = index_expr.get_index_key().ok_or(InferFailReason::None)?;
     let operator_index = db.get_operator_index();
-    if let Some(operator_maps) = operator_index.get_operators_by_type(&type_decl_id) {
-        let index_operator_ids = operator_maps
-            .get(&LuaOperatorMetaMethod::Index)
-            .ok_or(InferFailReason::None)?;
+    if let Some(index_operator_ids) =
+        operator_index.get_operators(&type_decl_id.clone().into(), LuaOperatorMetaMethod::Index)
+    {
         for index_operator_id in index_operator_ids {
             let index_operator = operator_index
                 .get_operator(index_operator_id)

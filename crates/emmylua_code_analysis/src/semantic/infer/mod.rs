@@ -150,8 +150,7 @@ fn get_custom_type_operator(
             LuaType::Def(type_id) => type_id,
             _ => return None,
         };
-        let ops = db.get_operator_index().get_operators_by_type(&type_id)?;
-        let op_ids = ops.get(&op)?;
+        let op_ids = db.get_operator_index().get_operators(&type_id.into(), op)?;
         let operators = op_ids
             .iter()
             .filter_map(|id| db.get_operator_index().get_operator(id))

@@ -25,7 +25,9 @@ pub use member::{
 };
 use module::LuaModuleIndex;
 pub use module::{ModuleInfo, WorkspaceId};
-pub use operators::{LuaOperator, LuaOperatorId, LuaOperatorIndex, LuaOperatorMetaMethod};
+pub use operators::{
+    LuaOperator, LuaOperatorId, LuaOperatorIndex, LuaOperatorMetaMethod, LuaOperatorOwner,
+};
 pub use property::{LuaPropertyId, LuaPropertyIndex};
 pub use r#type::*;
 pub use reference::{DeclReference, LuaReferenceIndex};

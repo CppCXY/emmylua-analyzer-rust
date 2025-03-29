@@ -233,6 +233,7 @@ fn parse_name_or_special_function(p: &mut LuaParser) -> ParseResult {
         SpecialFunction::Assert => LuaSyntaxKind::AssertCallExpr,
         SpecialFunction::Error => LuaSyntaxKind::ErrorCallExpr,
         SpecialFunction::Type => LuaSyntaxKind::TypeCallExpr,
+        SpecialFunction::Setmatable => LuaSyntaxKind::SetmetatableCallExpr,
         _ => LuaSyntaxKind::None,
     };
     p.bump();

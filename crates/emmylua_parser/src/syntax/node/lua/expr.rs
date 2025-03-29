@@ -49,7 +49,8 @@ impl LuaAstNode for LuaExpr {
             | LuaSyntaxKind::AssertCallExpr
             | LuaSyntaxKind::ErrorCallExpr
             | LuaSyntaxKind::RequireCallExpr
-            | LuaSyntaxKind::TypeCallExpr => true,
+            | LuaSyntaxKind::TypeCallExpr
+            | LuaSyntaxKind::SetmetatableCallExpr => true,
             LuaSyntaxKind::TableArrayExpr
             | LuaSyntaxKind::TableObjectExpr
             | LuaSyntaxKind::TableEmptyExpr => true,
@@ -73,7 +74,10 @@ impl LuaAstNode for LuaExpr {
             | LuaSyntaxKind::AssertCallExpr
             | LuaSyntaxKind::ErrorCallExpr
             | LuaSyntaxKind::RequireCallExpr
-            | LuaSyntaxKind::TypeCallExpr => LuaCallExpr::cast(syntax).map(LuaExpr::CallExpr),
+            | LuaSyntaxKind::TypeCallExpr
+            | LuaSyntaxKind::SetmetatableCallExpr => {
+                LuaCallExpr::cast(syntax).map(LuaExpr::CallExpr)
+            }
             LuaSyntaxKind::TableArrayExpr
             | LuaSyntaxKind::TableObjectExpr
             | LuaSyntaxKind::TableEmptyExpr => LuaTableExpr::cast(syntax).map(LuaExpr::TableExpr),
@@ -357,6 +361,7 @@ impl LuaAstNode for LuaCallExpr {
             || kind == LuaSyntaxKind::ErrorCallExpr
             || kind == LuaSyntaxKind::RequireCallExpr
             || kind == LuaSyntaxKind::TypeCallExpr
+            || kind == LuaSyntaxKind::SetmetatableCallExpr
     }
 
     fn cast(syntax: LuaSyntaxNode) -> Option<Self>
@@ -412,6 +417,10 @@ impl LuaCallExpr {
 
     pub fn is_type(&self) -> bool {
         self.syntax().kind() == LuaSyntaxKind::TypeCallExpr.into()
+    }
+
+    pub fn is_setmetatable(&self) -> bool {
+        self.syntax().kind() == LuaSyntaxKind::SetmetatableCallExpr.into()
     }
 }
 

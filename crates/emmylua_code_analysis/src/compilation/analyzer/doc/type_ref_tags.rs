@@ -219,8 +219,12 @@ pub fn analyze_return(analyzer: &mut DocAnalyzer, tag: LuaDocTagReturn) -> Optio
 pub fn analyze_overload(analyzer: &mut DocAnalyzer, tag: LuaDocTagOverload) -> Option<()> {
     if let Some(decl_id) = analyzer.current_type_id.clone() {
         let type_ref = infer_type(analyzer, tag.get_type()?);
-        let operator =
-            LuaOperator::new_call(decl_id.clone(), type_ref, analyzer.file_id, tag.get_range());
+        let operator = LuaOperator::new_call(
+            decl_id.clone().into(),
+            type_ref,
+            analyzer.file_id,
+            tag.get_range(),
+        );
         analyzer.db.get_operator_index_mut().add_operator(operator);
     } else if let Some(closure) = find_owner_closure(analyzer) {
         let type_ref = infer_type(analyzer, tag.get_type()?);

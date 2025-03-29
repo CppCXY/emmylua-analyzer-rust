@@ -207,20 +207,15 @@ fn infer_type_doc_function(
     }
 
     let operator_index = db.get_operator_index();
-    let operator_map = operator_index
-        .get_operators_by_type(&type_id)
-        .ok_or(InferFailReason::None)?;
-    let operator_ids = operator_map
-        .get(&LuaOperatorMetaMethod::Call)
+    let operator_ids = operator_index
+        .get_operators(&type_id.into(), LuaOperatorMetaMethod::Call)
         .ok_or(InferFailReason::None)?;
     let mut overloads = Vec::new();
     for overload_id in operator_ids {
         let operator = operator_index
             .get_operator(overload_id)
             .ok_or(InferFailReason::None)?;
-        let func = operator
-            .get_call_operator_type()
-            .ok_or(InferFailReason::None)?;
+        let func = operator.get_operator_func().ok_or(InferFailReason::None)?;
         match func {
             LuaType::DocFunction(f) => {
                 overloads.push(f.clone());
@@ -266,20 +261,15 @@ fn infer_generic_type_doc_function(
     }
 
     let operator_index = db.get_operator_index();
-    let operator_map = operator_index
-        .get_operators_by_type(&type_id)
-        .ok_or(InferFailReason::None)?;
-    let operator_ids = operator_map
-        .get(&LuaOperatorMetaMethod::Call)
+    let operator_ids = operator_index
+        .get_operators(&type_id.into(), LuaOperatorMetaMethod::Call)
         .ok_or(InferFailReason::None)?;
     let mut overloads = Vec::new();
     for overload_id in operator_ids {
         let operator = operator_index
             .get_operator(overload_id)
             .ok_or(InferFailReason::None)?;
-        let func = operator
-            .get_call_operator_type()
-            .ok_or(InferFailReason::None)?;
+        let func = operator.get_operator_func().ok_or(InferFailReason::None)?;
         let new_f = instantiate_type_generic(db, func, &substitutor);
         match new_f {
             LuaType::DocFunction(f) => {

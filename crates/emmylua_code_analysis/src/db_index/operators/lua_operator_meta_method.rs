@@ -25,7 +25,7 @@ pub enum LuaOperatorMetaMethod {
 }
 
 impl LuaOperatorMetaMethod {
-    pub fn from_str(op: &str) -> Option<Self> {
+    pub fn from_operator_name(op: &str) -> Option<Self> {
         match op {
             "add" => Some(LuaOperatorMetaMethod::Add),
             "sub" => Some(LuaOperatorMetaMethod::Sub),
@@ -48,6 +48,33 @@ impl LuaOperatorMetaMethod {
             "le" => Some(LuaOperatorMetaMethod::Le),
             "call" => Some(LuaOperatorMetaMethod::Call),
             "pairs" => Some(LuaOperatorMetaMethod::Pairs),
+            _ => None,
+        }
+    }
+
+    pub fn from_metatable_name(name: &str) -> Option<Self> {
+        match name {
+            "__add" => Some(LuaOperatorMetaMethod::Add),
+            "__sub" => Some(LuaOperatorMetaMethod::Sub),
+            "__mul" => Some(LuaOperatorMetaMethod::Mul),
+            "__div" => Some(LuaOperatorMetaMethod::Div),
+            "__mod" => Some(LuaOperatorMetaMethod::Mod),
+            "__pow" => Some(LuaOperatorMetaMethod::Pow),
+            "__unm" => Some(LuaOperatorMetaMethod::Unm),
+            "__idiv" => Some(LuaOperatorMetaMethod::IDiv),
+            "__band" => Some(LuaOperatorMetaMethod::BAnd),
+            "__bor" => Some(LuaOperatorMetaMethod::BOr),
+            "__bxor" => Some(LuaOperatorMetaMethod::BXor),
+            "__bnot" => Some(LuaOperatorMetaMethod::BNot),
+            "__shl" => Some(LuaOperatorMetaMethod::Shl),
+            "__shr" => Some(LuaOperatorMetaMethod::Shr),
+            "__concat" => Some(LuaOperatorMetaMethod::Concat),
+            "__len" => Some(LuaOperatorMetaMethod::Len),
+            "__eq" => Some(LuaOperatorMetaMethod::Eq),
+            "__lt" => Some(LuaOperatorMetaMethod::Lt),
+            "__le" => Some(LuaOperatorMetaMethod::Le),
+            "__index" => Some(LuaOperatorMetaMethod::Index),
+            "__call" => Some(LuaOperatorMetaMethod::Call),
             _ => None,
         }
     }

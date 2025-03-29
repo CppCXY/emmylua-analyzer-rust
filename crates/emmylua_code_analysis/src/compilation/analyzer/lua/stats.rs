@@ -418,13 +418,13 @@ pub fn analyze_for_range_stat(
                         }
                     } else if type_decl.is_class() {
                         let operator_index = analyzer.db.get_operator_index();
-                        let operator_map = operator_index.get_operators_by_type(&type_decl_id)?;
-                        let operator_ids = operator_map.get(&LuaOperatorMetaMethod::Call)?;
+                        let operator_ids = operator_index
+                            .get_operators(&type_decl_id.into(), LuaOperatorMetaMethod::Call)?;
                         operator_ids
                             .iter()
                             .filter_map(|overload_id| {
                                 let operator = operator_index.get_operator(overload_id)?;
-                                let func = operator.get_call_operator_type()?;
+                                let func = operator.get_operator_func()?;
                                 match func {
                                     LuaType::DocFunction(f) => {
                                         return Some(f.clone());

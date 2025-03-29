@@ -256,21 +256,15 @@ fn build_type_signature_help(
     current_idx: usize,
 ) -> Option<SignatureHelp> {
     let db = semantic_model.get_db();
-    let operators = db
+    let operator_ids = db
         .get_operator_index()
-        .get_operators_by_type(type_decl_id)?;
-    if let Some(operator_ids) = operators.get(&LuaOperatorMetaMethod::Call) {
-        for operator_id in operator_ids {
-            let operator = db.get_operator_index().get_operator(operator_id)?;
-            let call_type = operator.get_call_operator_type();
-            if let Some(LuaType::DocFunction(f)) = call_type {
-                return build_doc_function_signature_help(
-                    semantic_model,
-                    &f,
-                    colon_call,
-                    current_idx,
-                );
-            }
+        .get_operators(&type_decl_id.clone().into(), LuaOperatorMetaMethod::Call)?;
+
+    for operator_id in operator_ids {
+        let operator = db.get_operator_index().get_operator(operator_id)?;
+        let call_type = operator.get_operator_func();
+        if let Some(LuaType::DocFunction(f)) = call_type {
+            return build_doc_function_signature_help(semantic_model, &f, colon_call, current_idx);
         }
     }
 

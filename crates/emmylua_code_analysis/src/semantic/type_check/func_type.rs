@@ -192,12 +192,9 @@ fn check_doc_func_type_compact_for_custom_type(
         .ok_or(TypeCheckFailReason::TypeNotMatch)?;
 
     if type_decl.is_class() {
-        let operators = db
+        let call_operators = db
             .get_operator_index()
-            .get_operators_by_type(custom_type_id)
-            .ok_or(TypeCheckFailReason::TypeNotMatch)?;
-        let call_operators = operators
-            .get(&LuaOperatorMetaMethod::Call)
+            .get_operators(&custom_type_id.clone().into(), LuaOperatorMetaMethod::Call)
             .ok_or(TypeCheckFailReason::TypeNotMatch)?;
         for operator_id in call_operators {
             let operator = db
@@ -205,7 +202,7 @@ fn check_doc_func_type_compact_for_custom_type(
                 .get_operator(operator_id)
                 .ok_or(TypeCheckFailReason::TypeNotMatch)?;
             let call_type = operator
-                .get_call_operator_type()
+                .get_operator_func()
                 .ok_or(TypeCheckFailReason::TypeNotMatch)?;
             if let LuaType::DocFunction(doc_func) = call_type {
                 if check_doc_func_type_compact_for_params(

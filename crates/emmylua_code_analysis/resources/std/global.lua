@@ -332,34 +332,36 @@ function select(index, ...) end
 
 
 ---@class std.metatable
----@field __mode 'v'|'k'|'kv'|nil
----@field __metatable any|nil
----@field __tostring (fun(t):string)|nil
----@field __gc fun(t)|nil
----@field __add (fun(t1,t2):any)|nil
----@field __sub (fun(t1,t2):any)|nil
----@field __mul (fun(t1,t2):any)|nil
----@field __div (fun(t1,t2):any)|nil
----@field __mod (fun(t1,t2):any)|nil
----@field __pow (fun(t1,t2):any)|nil
----@field __unm (fun(t):any)|nil
----@field __idiv (fun(t1,t2):any)|nil
----@field __band (fun(t1,t2):any)|nil
----@field __bor (fun(t1,t2):any)|nil
----@field __bxor (fun(t1,t2):any)|nil
----@field __bnot (fun(t):any)|nil
----@field __shl (fun(t1,t2):any)|nil
----@field __shr (fun(t1,t2):any)|nil
----@field __concat (fun(t1,t2):any)|nil
----@field __len (fun(t):integer)|nil
----@field __eq (fun(t1,t2):boolean)|nil
----@field __lt (fun(t1,t2):boolean)|nil
----@field __le (fun(t1,t2):boolean)|nil
----@field __index table|(fun(t,k):any)|nil
----@field __newindex table|fun(t,k,v)|nil
----@field __call (fun(t,...):...)|nil
----@field __pairs (fun(t):((fun(t,k,v):any,any),any,any))|nil
----@field __close (fun(t,errobj):any)|nil
+---@field __mode? 'v'|'k'|'kv'
+---@field __metatable? any
+---@field __tostring? (fun(t):string)
+---@field __gc? fun(t)
+---@field __add? fun(t1,t2):any
+---@field __sub? fun(t1,t2):any
+---@field __mul? fun(t1,t2):any
+---@field __div? fun(t1,t2):any
+---@field __mod? fun(t1,t2):any
+---@field __pow? fun(t1,t2):any
+---@field __unm? fun(t):any
+---@field __idiv? fun(t1,t2):any
+---@field __band? fun(t1,t2):any
+---@field __bor? fun(t1,t2):any
+---@field __bxor? fun(t1,t2):any
+---@field __bnot? fun(t):any
+---@field __shl? fun(t1,t2):any
+---@field __shr? fun(t1,t2):any
+---@field __concat? fun(t1,t2):any
+---@field __len? fun(t):integer
+---@field __eq? fun(t1,t2):boolean
+---@field __lt? fun(t1,t2):boolean
+---@field __le? fun(t1,t2):boolean
+---@field __index? table|(fun(t,k):any
+---@field __newindex? table|fun(t,k,v
+---@field __call? fun(t,...): any...
+---@field __pairs? fun(t):((fun(t,k,v):any,any),any,any)
+---@field __close? fun(t,errobj):any
+
+--NOTE: The actual implementation of setmetatable is provided by the language server
 
 ---
 --- Sets the metatable for the given table. (To change the metatable of other
@@ -368,10 +370,9 @@ function select(index, ...) end
 --- metatable has a `"__metatable"` field, raises an error.
 ---
 --- This function returns `table`.
----@generic T
----@param table T
+---@param table table
 ---@param metatable std.metatable|table
----@return T
+---@return table
 function setmetatable(table, metatable) end
 
 ---

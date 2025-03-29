@@ -1,5 +1,6 @@
 mod closure;
 mod func_body;
+mod metatable;
 mod module;
 mod stats;
 
@@ -9,6 +10,7 @@ use closure::analyze_closure;
 pub use closure::analyze_return_point;
 use emmylua_parser::{LuaAst, LuaAstNode, LuaExpr};
 pub use func_body::LuaReturnPoint;
+use metatable::analyze_setmetatable;
 use module::analyze_chunk_return;
 use stats::{
     analyze_assign_stat, analyze_for_range_stat, analyze_func_stat, analyze_local_func_stat,
@@ -78,6 +80,11 @@ fn analyze_node(analyzer: &mut LuaAnalyzer, node: LuaAst) {
         }
         LuaAst::LuaClosureExpr(closure) => {
             analyze_closure(analyzer, closure);
+        }
+        LuaAst::LuaCallExpr(call_expr) => {
+            if call_expr.is_setmetatable() {
+                analyze_setmetatable(analyzer, call_expr);
+            }
         }
         _ => {}
     }

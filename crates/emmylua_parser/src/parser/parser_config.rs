@@ -45,6 +45,7 @@ impl<'cache> ParserConfig<'cache> {
             "error" => SpecialFunction::Error,
             "assert" => SpecialFunction::Assert,
             "type" => SpecialFunction::Type,
+            "setmetatable" => SpecialFunction::Setmatable,
             _ => *self
                 .special_like
                 .get(name)
@@ -73,4 +74,5 @@ pub enum SpecialFunction {
     Error,
     Assert,
     Type,
+    Setmatable,
 }

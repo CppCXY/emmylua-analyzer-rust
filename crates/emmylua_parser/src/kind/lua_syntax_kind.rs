@@ -35,14 +35,15 @@ pub enum LuaSyntaxKind {
     ClosureExpr,
     UnaryExpr,
     BinaryExpr,
-    TableArrayExpr,  // { a, b, c}
-    TableObjectExpr, // { a = 1, b = 2, c = 3}
-    TableEmptyExpr,  // {}
-    CallExpr,        // a()
-    RequireCallExpr, // require('a')
-    ErrorCallExpr,   // error('a')
-    AssertCallExpr,  // assert(a)
-    TypeCallExpr,    // type(a)
+    TableArrayExpr,       // { a, b, c}
+    TableObjectExpr,      // { a = 1, b = 2, c = 3}
+    TableEmptyExpr,       // {}
+    CallExpr,             // a()
+    RequireCallExpr,      // require('a')
+    ErrorCallExpr,        // error('a')
+    AssertCallExpr,       // assert(a)
+    TypeCallExpr,         // type(a)
+    SetmetatableCallExpr, // setmetatable(a, b)
     IndexExpr,
     NameExpr,
 

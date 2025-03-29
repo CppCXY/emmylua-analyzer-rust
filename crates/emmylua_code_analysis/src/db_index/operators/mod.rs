@@ -5,14 +5,15 @@ use std::collections::HashMap;
 
 use crate::FileId;
 
-use super::{traits::LuaIndex, LuaTypeDeclId};
-pub use lua_operator::{LuaOperator, LuaOperatorId};
+use super::traits::LuaIndex;
+pub use lua_operator::{LuaOperator, LuaOperatorId, LuaOperatorOwner};
 pub use lua_operator_meta_method::LuaOperatorMetaMethod;
 
 #[derive(Debug)]
 pub struct LuaOperatorIndex {
     operators: HashMap<LuaOperatorId, LuaOperator>,
-    type_operators_map: HashMap<LuaTypeDeclId, HashMap<LuaOperatorMetaMethod, Vec<LuaOperatorId>>>,
+    type_operators_map:
+        HashMap<LuaOperatorOwner, HashMap<LuaOperatorMetaMethod, Vec<LuaOperatorId>>>,
     in_filed_operator_map: HashMap<FileId, Vec<LuaOperatorId>>,
 }
 
@@ -42,11 +43,14 @@ impl LuaOperatorIndex {
             .push(id);
     }
 
-    pub fn get_operators_by_type(
+    pub fn get_operators(
         &self,
-        type_id: &LuaTypeDeclId,
-    ) -> Option<&HashMap<LuaOperatorMetaMethod, Vec<LuaOperatorId>>> {
-        self.type_operators_map.get(type_id)
+        owner: &LuaOperatorOwner,
+        meta_method: LuaOperatorMetaMethod,
+    ) -> Option<&Vec<LuaOperatorId>> {
+        self.type_operators_map
+            .get(owner)
+            .and_then(|map| map.get(&meta_method))
     }
 
     pub fn get_operator(&self, id: &LuaOperatorId) -> Option<&LuaOperator> {

@@ -1,6 +1,11 @@
+mod infer_require;
+mod infer_setmetatable;
+
 use std::{ops::Deref, sync::Arc};
 
 use emmylua_parser::{LuaAstNode, LuaCallExpr, LuaExpr, LuaSyntaxKind};
+use infer_require::infer_require_call;
+use infer_setmetatable::infer_setmetatable_call;
 use rowan::TextRange;
 
 use crate::{
@@ -26,6 +31,8 @@ pub fn infer_call_expr(
     let prefix_expr = call_expr.get_prefix_expr().ok_or(InferFailReason::None)?;
     if call_expr.is_require() {
         return infer_require_call(db, cache, call_expr);
+    } else if call_expr.is_setmetatable() {
+        return infer_setmetatable_call(db, cache, call_expr);
     }
 
     check_can_infer(db, cache, &call_expr)?;
@@ -234,19 +241,15 @@ fn collect_func_by_custom_type(
     }
 
     let operator_index = db.get_operator_index();
-    let operator_map = operator_index
-        .get_operators_by_type(&type_id)
+    let operator_ids = operator_index
+        .get_operators(&type_id.into(), LuaOperatorMetaMethod::Call)
         .ok_or(InferFailReason::None)?;
-    let operator_ids = operator_map
-        .get(&LuaOperatorMetaMethod::Call)
-        .ok_or(InferFailReason::None)?;
+
     for overload_id in operator_ids {
         let operator = operator_index
             .get_operator(overload_id)
             .ok_or(InferFailReason::None)?;
-        let func = operator
-            .get_call_operator_type()
-            .ok_or(InferFailReason::None)?;
+        let func = operator.get_operator_func().ok_or(InferFailReason::None)?;
         match func {
             LuaType::DocFunction(f) => {
                 funcs.push(f.clone());
@@ -284,20 +287,15 @@ fn collect_call_by_custom_generic_type(
     }
 
     let operator_index = db.get_operator_index();
-    let operator_map = operator_index
-        .get_operators_by_type(&type_id)
-        .ok_or(InferFailReason::None)?;
-    let operator_ids = operator_map
-        .get(&LuaOperatorMetaMethod::Call)
+    let operator_ids = operator_index
+        .get_operators(&type_id.into(), LuaOperatorMetaMethod::Call)
         .ok_or(InferFailReason::None)?;
     let mut overloads = Vec::new();
     for overload_id in operator_ids {
         let operator = operator_index
             .get_operator(overload_id)
             .ok_or(InferFailReason::None)?;
-        let func = operator
-            .get_call_operator_type()
-            .ok_or(InferFailReason::None)?;
+        let func = operator.get_operator_func().ok_or(InferFailReason::None)?;
         let new_f = instantiate_type_generic(db, func, &substitutor);
         match new_f {
             LuaType::DocFunction(f) => {
@@ -427,29 +425,4 @@ fn is_last_call_expr(call_expr: &LuaCallExpr) -> bool {
     }
 
     false
-}
-
-fn infer_require_call(
-    db: &DbIndex,
-    cache: &mut LuaInferCache,
-    call_expr: LuaCallExpr,
-) -> InferResult {
-    let arg_list = call_expr.get_args_list().ok_or(InferFailReason::None)?;
-    let first_arg = arg_list.get_args().next().ok_or(InferFailReason::None)?;
-    let require_path_type = infer_expr(db, cache, first_arg)?;
-    let module_path: String = match &require_path_type {
-        LuaType::StringConst(module_path) => module_path.as_ref().to_string(),
-        _ => {
-            return Ok(LuaType::Any);
-        }
-    };
-
-    let module_info = db
-        .get_module_index()
-        .find_module(&module_path)
-        .ok_or(InferFailReason::None)?;
-    match &module_info.export_type {
-        Some(ty) => Ok(ty.clone()),
-        None => Err(InferFailReason::UnResolveExpr(call_expr.into())),
-    }
 }

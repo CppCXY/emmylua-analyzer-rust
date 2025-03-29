@@ -77,7 +77,7 @@ pub fn analyze_field(analyzer: &mut DocAnalyzer, tag: LuaDocTagField) -> Option<
             }
 
             let operator = LuaOperator::new(
-                current_type_id.clone(),
+                current_type_id.clone().into(),
                 LuaOperatorMetaMethod::Index,
                 vec![key_type_ref],
                 field_type,
@@ -133,7 +133,7 @@ pub fn analyze_field(analyzer: &mut DocAnalyzer, tag: LuaDocTagField) -> Option<
 pub fn analyze_operator(analyzer: &mut DocAnalyzer, tag: LuaDocTagOperator) -> Option<()> {
     let current_type_id = analyzer.current_type_id.clone()?;
     let name_token = tag.get_name_token()?;
-    let op_kind = LuaOperatorMetaMethod::from_str(name_token.get_name_text())?;
+    let op_kind = LuaOperatorMetaMethod::from_operator_name(name_token.get_name_text())?;
     let operands: Vec<LuaType> = tag
         .get_param_list()?
         .get_types()
@@ -147,7 +147,7 @@ pub fn analyze_operator(analyzer: &mut DocAnalyzer, tag: LuaDocTagOperator) -> O
     };
 
     let operator = LuaOperator::new(
-        current_type_id,
+        current_type_id.into(),
         op_kind,
         operands,
         return_type,

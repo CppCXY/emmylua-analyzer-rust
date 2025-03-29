@@ -339,8 +339,8 @@ Syntax(Chunk)@0..770
     Token(TkEndOfLine)@672..673 "\n"
     Token(TkEndOfLine)@673..674 "\n"
     Token(TkWhitespace)@674..686 "            "
-    Syntax(CallExprStat)@686..705
-      Syntax(CallExpr)@686..705
+    Syntax(AssignStat)@686..705
+      Syntax(SetmetatableCallExpr)@686..705
         Syntax(NameExpr)@686..698
           Token(TkName)@686..698 "setmetatable"
         Syntax(CallArgList)@698..705
@@ -388,6 +388,7 @@ Syntax(Chunk)@0..770
     Token(TkEndOfLine)@761..762 "\n"
     Token(TkWhitespace)@762..770 "        "
 "#;
+
         assert_ast_eq!(code, result);
     }
 
