@@ -90,6 +90,7 @@ fn add_type_ref_completion(
                     LuaMemberKey::Name(str) => to_enum_label(builder, str.as_str()),
                     LuaMemberKey::Integer(i) => i.to_string(),
                     LuaMemberKey::None => continue,
+                    LuaMemberKey::SyntaxId(_) => continue,
                 };
 
                 let completion_item = CompletionItem {
@@ -476,6 +477,7 @@ fn add_enum_members_completion(
                 LuaMemberKey::Name(str) => format!("{}.{}", variable_name, str.to_string()),
                 LuaMemberKey::Integer(i) => format!("{}[{}]", variable_name, i),
                 LuaMemberKey::None => continue,
+                LuaMemberKey::SyntaxId(_) => continue,
             };
 
             let description = format!("{}", type_id.get_name());

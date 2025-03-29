@@ -141,6 +141,7 @@ pub enum LuaMemberKey {
     None,
     Integer(i64),
     Name(SmolStr),
+    SyntaxId(LuaSyntaxId),
 }
 
 impl LuaMemberKey {
@@ -154,6 +155,10 @@ impl LuaMemberKey {
 
     pub fn is_integer(&self) -> bool {
         matches!(self, LuaMemberKey::Integer(_))
+    }
+
+    pub fn is_syntax_id(&self) -> bool {
+        matches!(self, LuaMemberKey::SyntaxId(_))
     }
 
     pub fn get_name(&self) -> Option<&str> {
@@ -177,6 +182,7 @@ impl LuaMemberKey {
                 format!("[{}]", i)
             }
             LuaMemberKey::None => "".to_string(),
+            LuaMemberKey::SyntaxId(_) => "".to_string(),
         }
     }
 }
@@ -198,6 +204,9 @@ impl Ord for LuaMemberKey {
             (Integer(_), _) => std::cmp::Ordering::Less,
             (_, Integer(_)) => std::cmp::Ordering::Greater,
             (Name(a), Name(b)) => a.cmp(b),
+            (Name(_), _) => std::cmp::Ordering::Less,
+            (_, Name(_)) => std::cmp::Ordering::Greater,
+            (SyntaxId(_), SyntaxId(_)) => std::cmp::Ordering::Equal,
         }
     }
 }

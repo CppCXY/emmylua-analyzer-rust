@@ -343,4 +343,22 @@ end
         let a_desc = ws.humanize_type(a);
         assert_eq!(a_desc, "table");
     }
+
+    #[test]
+    fn test_docint() {
+        let mut ws = VirtualWorkspace::new();
+
+        ws.def(
+            r#"
+            local stack = 0
+            if stack ~= 0 then
+                a = stack
+            end
+        "#,
+        );
+
+        let a = ws.expr_ty("a");
+        let a_desc = ws.humanize_type(a);
+        assert_eq!(a_desc, "integer");
+    }
 }

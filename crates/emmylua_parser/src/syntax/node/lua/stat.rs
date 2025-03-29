@@ -159,6 +159,20 @@ impl LuaLocalStat {
     pub fn get_value_exprs(&self) -> LuaAstChildren<LuaExpr> {
         self.children()
     }
+
+    pub fn get_value_local_name(&self, value: LuaExpr) -> Option<LuaLocalName> {
+        let local_names = self.get_local_name_list();
+        let value_exprs = self.get_value_exprs().collect::<Vec<_>>();
+
+        for (i, local_name) in local_names.enumerate() {
+            if let Some(value_expr) = value_exprs.get(i) {
+                if value_expr.syntax() == value.syntax() {
+                    return Some(local_name);
+                }
+            }
+        }
+        None
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]

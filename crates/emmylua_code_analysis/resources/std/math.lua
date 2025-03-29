@@ -186,7 +186,7 @@ function math.tan(x) return 0 end
 ---
 --- If the value `x` is convertible to an integer, returns that integer.
 --- Otherwise, returns `nil`.
----@param x number
+---@param x any
 ---@return integer?
 function math.tointeger(x) end
 

@@ -445,4 +445,51 @@ mod test {
         "#
         ))
     }
+
+    #[test]
+    fn test_4() {
+        let mut ws = VirtualWorkspace::new();
+
+        assert!(ws.check_code_for(
+            DiagnosticCode::ParamTypeNotMatch,
+            r#" 
+            ---@class D13.Meta
+            ---@field __defineGet fun(self: self, key: string, f: fun(self: self): any)
+
+            ---@class D13.Impl: D13.Meta
+            local impl = {}
+
+            impl:__defineGet("value", function(self)
+                return 1
+            end)
+
+            "#
+        ));
+    }
+
+    #[test]
+    fn test_issue_286() {
+        let mut ws = VirtualWorkspace::new();
+        assert!(ws.check_code_for(
+            DiagnosticCode::ParamTypeNotMatch,
+            r#"
+                local a --- @type boolean
+                local b --- @type integer?
+                local c = a and b or nil
+                -- type of c is (nil|true), should be (integer|nil)
+                local d = a and b
+                -- type of d is (boolean|nil), should be (false|integer|nil) 
+
+                ---@param p integer?
+                local function f1(p)
+                end
+                f1(c)
+
+                ---@param p false|integer|nil
+                local function f2(p)
+                end
+                f2(d)
+        "#
+        ));
+    }
 }

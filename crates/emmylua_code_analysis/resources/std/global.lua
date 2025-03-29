@@ -389,13 +389,11 @@ function setmetatable(table, metatable) end
 --- represents 10, 'B' represents 11, and so forth, with 'Z' representing 35. If
 --- the string `e` is not a valid numeral in the given base, the function
 --- returns **nil**.
----@overload fun(e:number, base?: int):number
----@overload fun(e:string, base?: int):number?
----@overload fun(e:any, base?:int):nil
+---@overload fun(e: string, base: integer):integer?
 ---@param e any
----@param base? int
 ---@return number?
-function tonumber(e, base) end
+---@nodiscard
+function tonumber(e) end
 
 ---
 --- Receives a value of any type and converts it to a string in a human-readable

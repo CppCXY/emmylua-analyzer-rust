@@ -1,4 +1,4 @@
-use emmylua_parser::{LuaAstNode, LuaBlock, LuaCallExpr};
+use emmylua_parser::{LuaAstNode, LuaBlock, LuaCallExpr, LuaIndexExpr};
 use rowan::TextRange;
 
 use crate::{DiagnosticCode, LuaType, SemanticModel};
@@ -27,6 +27,9 @@ fn check_require_call_expr(
     call_expr: LuaCallExpr,
     require_calls: &mut Vec<(TextRange, String)>,
 ) -> Option<()> {
+    if let Some(_) = call_expr.get_parent::<LuaIndexExpr>() {
+        return Some(());
+    }
     let args_list = call_expr.get_args_list()?;
     let arg_expr = args_list.get_args().next()?;
 

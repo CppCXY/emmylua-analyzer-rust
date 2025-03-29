@@ -2,7 +2,11 @@ use crate::{LuaType, LuaUnionType};
 
 pub fn remove_type(source: LuaType, removed_type: LuaType) -> Option<LuaType> {
     if source == removed_type {
-        return None;
+        match source {
+            LuaType::IntegerConst(_) => return Some(LuaType::Integer),
+            LuaType::FloatConst(_) => return Some(LuaType::Number),
+            _ => return None,
+        }
     }
 
     match (&source, &removed_type) {

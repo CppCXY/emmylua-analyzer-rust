@@ -57,4 +57,8 @@ impl TypeAssertion {
             _ => Ok(source),
         }
     }
+
+    pub fn is_reassign(&self) -> bool {
+        matches!(self, TypeAssertion::Reassign(_))
+    }
 }

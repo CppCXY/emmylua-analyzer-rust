@@ -66,6 +66,7 @@ pub fn check_ref_type_compact(
                     LuaMemberKey::Name(name) => LuaType::DocStringConst(name.clone().into()),
                     LuaMemberKey::Integer(i) => LuaType::IntegerConst(i.clone()),
                     LuaMemberKey::None => continue,
+                    LuaMemberKey::SyntaxId(_) => continue,
                 };
 
                 union_types.push(fake_type);

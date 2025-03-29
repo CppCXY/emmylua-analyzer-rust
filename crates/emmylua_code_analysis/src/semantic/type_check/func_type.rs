@@ -91,6 +91,9 @@ fn check_doc_func_type_compact_for_params(
 
         match (source_param_type, compact_param_type) {
             (Some(source_type), Some(compact_type)) => {
+                if source_type.is_self_infer() && compact_type.is_self_infer() {
+                    continue;
+                }
                 if check_general_type_compact(
                     db,
                     source_type,
