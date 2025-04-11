@@ -1,5 +1,8 @@
+use std::sync::Arc;
+
 use crate::{infer_expr, DbIndex, InferFailReason, LuaInferCache};
 use emmylua_parser::{LuaAstNode, LuaExpr, LuaSyntaxId, LuaSyntaxNode};
+use rowan::TextSize;
 
 use super::{type_ops::TypeOps, LuaType};
 
@@ -10,7 +13,7 @@ pub enum TypeAssertion {
     Narrow(LuaType),
     Add(LuaType),
     Remove(LuaType),
-    Reassign((LuaSyntaxId, i32)),
+    Reassign((LuaSyntaxId, i32))
 }
 
 #[allow(unused)]

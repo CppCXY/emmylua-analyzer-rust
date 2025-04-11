@@ -2,16 +2,15 @@ use emmylua_parser::{LuaAst, LuaAstNode, LuaBlock};
 
 use crate::{DbIndex, LuaFlowChain, TypeAssertion, VarRefId};
 
-use super::broadcast_down::broadcast_down;
+use super::{broadcast_down::broadcast_down, VarTrace};
 
-pub fn broadcast_outside(
+pub fn broadcast_outside_block(
     db: &mut DbIndex,
-    flow_chain: &mut LuaFlowChain,
-    var_ref_id: &VarRefId,
-    node: LuaBlock,
+    var_trace: &mut VarTrace,
+    block: LuaBlock,
     type_assert: TypeAssertion,
 ) -> Option<()> {
-    let parent = node.get_parent::<LuaAst>()?;
+    let parent = block.get_parent::<LuaAst>()?;
     match &parent {
         LuaAst::LuaIfStat(_)
         | LuaAst::LuaDoStat(_)
@@ -19,13 +18,12 @@ pub fn broadcast_outside(
         | LuaAst::LuaForStat(_)
         | LuaAst::LuaForRangeStat(_)
         | LuaAst::LuaRepeatStat(_) => {
-            broadcast_down(db, flow_chain, var_ref_id, parent, type_assert, false);
+            broadcast_down(db, var_trace, parent, type_assert, false);
         }
         LuaAst::LuaElseIfClauseStat(_) | LuaAst::LuaElseClauseStat(_) => {
             broadcast_down(
                 db,
-                flow_chain,
-                var_ref_id,
+                var_trace,
                 parent.get_parent::<LuaAst>()?,
                 type_assert,
                 false,

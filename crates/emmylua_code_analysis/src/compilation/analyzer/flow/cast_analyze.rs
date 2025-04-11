@@ -1,9 +1,10 @@
 use emmylua_parser::{BinaryOperator, LuaAstNode, LuaBlock, LuaDocTagCast};
 
 use crate::{
-    compilation::analyzer::AnalyzeContext, FileId, InFiled, LuaFlowChain, LuaType, TypeAssertion,
-    VarRefId,
+    compilation::analyzer::AnalyzeContext, FileId, InFiled, LuaType, TypeAssertion,
 };
+
+use super::var_analyze::VarTrace;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum CastAction {
@@ -13,14 +14,12 @@ enum CastAction {
 }
 
 pub fn analyze_cast(
-    flow_chain: &mut LuaFlowChain,
+    var_trace: &mut VarTrace,
     file_id: FileId,
-    var_ref_id: &VarRefId,
     tag: LuaDocTagCast,
     context: &AnalyzeContext,
 ) -> Option<()> {
     let effect_range = tag.ancestors::<LuaBlock>().next()?.get_range();
-    let actual_range = tag.get_range();
     for cast_op_type in tag.get_op_types() {
         let action = match cast_op_type.get_op() {
             Some(op) => {
@@ -36,19 +35,15 @@ pub fn analyze_cast(
         if cast_op_type.is_nullable() {
             match action {
                 CastAction::Add => {
-                    flow_chain.add_type_assert(
-                        var_ref_id,
+                    var_trace.add_assert(
                         TypeAssertion::Add(LuaType::Nil),
                         effect_range,
-                        actual_range,
                     );
                 }
                 CastAction::Remove => {
-                    flow_chain.add_type_assert(
-                        var_ref_id,
+                    var_trace.add_assert(
                         TypeAssertion::Remove(LuaType::Nil),
                         effect_range,
-                        actual_range,
                     );
                 }
                 _ => {}
@@ -62,27 +57,21 @@ pub fn analyze_cast(
 
             match action {
                 CastAction::Add => {
-                    flow_chain.add_type_assert(
-                        var_ref_id,
+                    var_trace.add_assert(
                         TypeAssertion::Add(typ),
-                        effect_range,
-                        actual_range,
+                        effect_range
                     );
                 }
                 CastAction::Remove => {
-                    flow_chain.add_type_assert(
-                        var_ref_id,
+                    var_trace.add_assert(
                         TypeAssertion::Remove(typ),
                         effect_range,
-                        actual_range,
                     );
                 }
                 CastAction::Force => {
-                    flow_chain.add_type_assert(
-                        var_ref_id,
+                    var_trace.add_assert(
                         TypeAssertion::Narrow(typ),
                         effect_range,
-                        actual_range,
                     );
                 }
             }

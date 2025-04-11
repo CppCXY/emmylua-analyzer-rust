@@ -1,31 +1,31 @@
 mod broadcast_down;
+mod broadcast_inside;
 mod broadcast_outside;
 mod broadcast_up;
+mod var_trace;
 
 use broadcast_down::broadcast_down;
 use broadcast_up::broadcast_up;
 use emmylua_parser::{
-    BinaryOperator, LuaAssignStat, LuaAst, LuaAstNode, LuaBinaryExpr, LuaBlock, LuaCallArgList,
-    LuaCallExpr, LuaCallExprStat, LuaCommentOwner, LuaDocTag, LuaExpr, LuaLiteralToken, LuaStat,
-    LuaVarExpr,
+    BinaryOperator, LuaAssignStat, LuaAst, LuaAstNode, LuaBinaryExpr, LuaCallArgList, LuaCallExpr,
+    LuaCallExprStat, LuaCommentOwner, LuaDocTag, LuaExpr, LuaLiteralToken, LuaVarExpr,
 };
 
 use crate::{
     db_index::{LuaType, TypeAssertion},
-    DbIndex, FileId, LuaDeclId, LuaFlowChain, LuaMemberId, LuaTypeDeclId, LuaTypeOwner, VarRefId,
+    DbIndex, FileId, LuaDeclId, LuaMemberId, LuaTypeDeclId, LuaTypeOwner,
 };
+pub use var_trace::VarTrace;
 
 pub fn analyze_ref_expr(
     db: &mut DbIndex,
-    flow_chain: &mut LuaFlowChain,
+    var_trace: &mut VarTrace,
     var_expr: &LuaVarExpr,
-    var_ref_id: &VarRefId,
 ) -> Option<()> {
     let parent = var_expr.get_parent::<LuaAst>()?;
     broadcast_up(
         db,
-        flow_chain,
-        &var_ref_id,
+        var_trace,
         parent,
         LuaAst::cast(var_expr.syntax().clone())?,
         TypeAssertion::Exist,
@@ -36,9 +36,8 @@ pub fn analyze_ref_expr(
 
 pub fn analyze_ref_assign(
     db: &mut DbIndex,
-    flow_chain: &mut LuaFlowChain,
+    var_trace: &mut VarTrace,
     var_expr: &LuaVarExpr,
-    var_ref_id: &VarRefId,
     file_id: FileId,
 ) -> Option<()> {
     let assign_stat = var_expr.get_parent::<LuaAssignStat>()?;
@@ -57,8 +56,7 @@ pub fn analyze_ref_assign(
             let type_assert = TypeAssertion::Narrow(type_cache.as_type().clone());
             broadcast_down(
                 db,
-                flow_chain,
-                var_ref_id,
+                var_trace,
                 LuaAst::LuaAssignStat(assign_stat),
                 type_assert,
                 true,
@@ -89,8 +87,7 @@ pub fn analyze_ref_assign(
     let type_assert = TypeAssertion::Reassign((value_expr.get_syntax_id(), idx));
     broadcast_down(
         db,
-        flow_chain,
-        var_ref_id,
+        var_trace,
         LuaAst::LuaAssignStat(assign_stat),
         type_assert,
         true,
@@ -118,18 +115,23 @@ fn is_decl_assign_stat(assign_stat: LuaAssignStat) -> Option<bool> {
 
 fn infer_call_arg_list(
     db: &mut DbIndex,
-    flow_chain: &mut LuaFlowChain,
+    var_trace: &mut VarTrace,
     type_assert: TypeAssertion,
-    var_ref_id: &VarRefId,
     call_arg: LuaCallArgList,
 ) -> Option<()> {
     let parent = call_arg.get_parent::<LuaAst>()?;
     match parent {
         LuaAst::LuaCallExpr(call_expr) => {
             if call_expr.is_type() {
-                infer_lua_type_assert(db, flow_chain, var_ref_id, call_expr);
+                infer_lua_type_assert(db, var_trace, call_expr);
             } else if call_expr.is_assert() {
-                infer_lua_assert(db, flow_chain, type_assert, var_ref_id, call_expr);
+                broadcast_down(
+                    db,
+                    var_trace,
+                    LuaAst::LuaCallExprStat(call_expr.get_parent::<LuaCallExprStat>()?),
+                    type_assert.clone(),
+                    true,
+                );
             }
         }
         _ => {}
@@ -140,8 +142,7 @@ fn infer_call_arg_list(
 
 fn infer_lua_type_assert(
     db: &mut DbIndex,
-    flow_chain: &mut LuaFlowChain,
-    var_ref_id: &VarRefId,
+    var_trace: &mut VarTrace,
     call_expr: LuaCallExpr,
 ) -> Option<()> {
     let binary_expr = call_expr.get_parent::<LuaBinaryExpr>()?;
@@ -188,58 +189,11 @@ fn infer_lua_type_assert(
 
     broadcast_up(
         db,
-        flow_chain,
-        var_ref_id,
+        var_trace,
         binary_expr.get_parent::<LuaAst>()?,
         LuaAst::LuaBinaryExpr(binary_expr),
         type_assert,
     );
 
-    Some(())
-}
-
-fn is_block_has_return(block: Option<LuaBlock>) -> Option<bool> {
-    if let Some(block) = block {
-        for stat in block.get_stats() {
-            if is_stat_change_flow(stat.clone()).unwrap_or(false) {
-                return Some(true);
-            }
-        }
-    }
-
-    Some(false)
-}
-
-fn is_stat_change_flow(stat: LuaStat) -> Option<bool> {
-    match stat {
-        LuaStat::CallExprStat(call_stat) => {
-            let call_expr = call_stat.get_call_expr()?;
-            if call_expr.is_error() {
-                return Some(true);
-            }
-            Some(false)
-        }
-        LuaStat::ReturnStat(_) => Some(true),
-        LuaStat::DoStat(do_stat) => Some(is_block_has_return(do_stat.get_block()).unwrap_or(false)),
-        LuaStat::BreakStat(_) => Some(true),
-        _ => Some(false),
-    }
-}
-
-fn infer_lua_assert(
-    db: &mut DbIndex,
-    flow_chain: &mut LuaFlowChain,
-    type_assert: TypeAssertion,
-    var_ref_id: &VarRefId,
-    call_expr: LuaCallExpr,
-) -> Option<()> {
-    broadcast_down(
-        db,
-        flow_chain,
-        var_ref_id,
-        LuaAst::LuaCallExprStat(call_expr.get_parent::<LuaCallExprStat>()?),
-        type_assert.clone(),
-        true,
-    );
     Some(())
 }
